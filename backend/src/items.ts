@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import type { Prisma } from '@prisma/client';
+import { z } from 'zod';
+import { prisma } from './db.js';
+import { validate } from './middleware.js';
+const router=Router();
+const variant=z.object({id:z.string().uuid().optional(),color:z.string().trim().min(1).max(50),stockQuantity:z.number().int().min(0).max(100000)});
+const item=z.object({id:z.string().uuid().optional(),modelNumber:z.string().trim().min(1).max(80),price:z.number().nonnegative().max(10000000),photoUrl:z.string().max(1_500_000).refine(value=>/^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(value)||/^https?:\/\//i.test(value),'Photo must be an uploaded image or a valid web URL').nullish(),size:z.string().max(80).nullish(),material:z.string().max(500).nullish(),variants:z.array(variant).min(1)});
+router.get('/',async(req,res)=>{const q=String(req.query.q??'').trim(),color=String(req.query.color??'').trim(),min=Number(req.query.minPrice??0),max=Number(req.query.maxPrice??Number.MAX_SAFE_INTEGER);const data=await prisma.item.findMany({where:{deletedAt:null,price:{gte:min,lt:max},AND:q?[{OR:[{modelNumber:{contains:q,mode:'insensitive'}},{material:{contains:q,mode:'insensitive'}},{size:{contains:q,mode:'insensitive'}},{variants:{some:{color:{contains:q,mode:'insensitive'}}}}]}]:[],variants:color?{some:{color:{contains:color,mode:'insensitive'},deletedAt:null}}:undefined},include:{variants:{where:{deletedAt:null}}},orderBy:{updatedAt:'desc'}});res.json(data);});
+router.post('/',validate(item),async(req,res)=>{const {variants,...data}=req.body;const created=await prisma.item.create({data:{...data,id:data.id,variants:{create:variants}},include:{variants:true}});res.status(201).json(created);});
+router.put('/:id',validate(item),async(req,res)=>{const {variants,...data}=req.body;const updated=await prisma.$transaction(async (tx:Prisma.TransactionClient)=>{await tx.itemVariant.deleteMany({where:{itemId:String(req.params.id)}});return tx.item.update({where:{id:String(req.params.id)},data:{...data,id:undefined,variants:{create:variants}},include:{variants:true}})});res.json(updated);});
+router.delete('/:id',async(req,res)=>{await prisma.item.update({where:{id:String(req.params.id)},data:{deletedAt:new Date()}});res.status(204).end();});
+export default router;

@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: {POSTGRES_USER: konooz, POSTGRES_PASSWORD: konooz, POSTGRES_DB: konooz}
+    ports: ["5432:5432"]
+    volumes: ["konooz_pg:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U konooz"], interval: 5s, timeout: 5s, retries: 10}
+  backend:
+    build: {context: ., dockerfile: backend/Dockerfile}
+    env_file: backend/.env
+    environment:
+      DATABASE_URL: postgresql://konooz:konooz@postgres:5432/konooz?schema=public
+    ports: ["4000:4000"]
+    depends_on: {postgres: {condition: service_healthy}}
+volumes: {konooz_pg: {}}

@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/db.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/shell.tsx","./src/components/silkscene.tsx","./src/hooks/usesync.ts","./src/pages/dashboard.tsx","./src/pages/inventory.tsx","./src/pages/login.tsx","./src/pages/receipt.tsx","./src/pages/sales.tsx","./src/pages/sell.tsx"],"version":"5.8.3"}

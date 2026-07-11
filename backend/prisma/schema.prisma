@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SyncStatus {
+  pending
+  synced
+  conflict
+}
+
+model Item {
+  id          String        @id @default(uuid()) @db.Uuid
+  modelNumber String        @unique @map("model_number")
+  price       Decimal       @db.Decimal(12, 2)
+  photoUrl    String?       @map("photo_url")
+  size        String?
+  material    String?
+  deletedAt   DateTime?     @map("deleted_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  syncStatus  SyncStatus    @default(synced) @map("sync_status")
+  variants    ItemVariant[]
+
+  @@map("items")
+}
+
+model ItemVariant {
+  id            String     @id @default(uuid()) @db.Uuid
+  itemId        String     @map("item_id") @db.Uuid
+  color         String
+  stockQuantity Int        @default(0) @map("stock_quantity")
+  deletedAt     DateTime?  @map("deleted_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  syncStatus    SyncStatus @default(synced) @map("sync_status")
+  item          Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  saleItems     SaleItem[]
+
+  @@unique([itemId, color])
+  @@map("item_variants")
+}
+
+model Sale {
+  id          String     @id @default(uuid()) @db.Uuid
+  totalAmount Decimal    @map("total_amount") @db.Decimal(12, 2)
+  deletedAt   DateTime?  @map("deleted_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  syncStatus  SyncStatus @default(synced) @map("sync_status")
+  items       SaleItem[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id              String      @id @default(uuid()) @db.Uuid
+  saleId          String      @map("sale_id") @db.Uuid
+  itemVariantId   String      @map("item_variant_id") @db.Uuid
+  quantity        Int
+  unitPriceAtSale Decimal     @map("unit_price_at_sale") @db.Decimal(12, 2)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  syncStatus      SyncStatus  @default(synced) @map("sync_status")
+  sale            Sale        @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  itemVariant     ItemVariant @relation(fields: [itemVariantId], references: [id])
+
+  @@map("sale_items")
+}
+
+model AdminUser {
+  id               String   @id @default(uuid()) @db.Uuid
+  username         String   @unique
+  passwordHash     String   @map("password_hash")
+  refreshTokenHash String?  @map("refresh_token_hash")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("admin_user")
+}
+
+model ConflictLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  tableName     String   @map("table_name")
+  recordId      String   @map("record_id") @db.Uuid
+  clientPayload Json     @map("client_payload")
+  serverPayload Json     @map("server_payload")
+  resolution    String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("conflict_logs")
+}
