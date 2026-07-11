@@ -14,4 +14,4 @@ COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/backend/dist backend/dist
 COPY --from=build /app/backend/prisma backend/prisma
 EXPOSE 4000
-CMD ["node","backend/dist/src/server.js"]
+CMD ["sh", "-c", "npm run db:migrate -w backend && node backend/dist/src/server.js"]
