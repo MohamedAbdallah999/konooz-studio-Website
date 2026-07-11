@@ -1,135 +1,197 @@
-# Production deployment
+# No-card production deployment
 
-This project is prepared for this deployment layout:
+This project uses:
 
-- PostgreSQL: Neon
-- API: Render (Docker Blueprint)
-- Frontend: Vercel
+- Database: Neon Free
+- API: Cloudflare Workers Free
+- Frontend: Cloudflare Pages Free
 - Source: GitHub
 
-Never commit `backend/.env` or `frontend/.env`. Render and Vercel must hold production values.
+Cloudflare does not require a payment card for the Free plan. Do not use the removed Render Blueprint.
 
-## 1. Push the repository to GitHub
+## Completed before this guide
 
-Create a private GitHub repository, then run from the project root:
+The GitHub repository, Neon database, database schema, administrator seed, and initial frontend preparation were completed in Steps 1-4.
 
-```powershell
-git add .
-git commit -m "Prepare production deployment"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/konooz-studio.git
-git push -u origin main
-```
+## Step 5 — apply the new production database migration
 
-If `origin` already exists, do not add it again. Confirm the local secret files are ignored:
+A new migration enables PostgreSQL `pgcrypto`, allowing password verification to run in Neon instead of consuming Cloudflare Worker CPU.
 
-```powershell
-git check-ignore backend/.env frontend/.env
-```
-
-Both paths should be printed.
-
-## 2. Create Neon PostgreSQL
-
-1. Sign in at https://console.neon.tech/.
-2. Create a project named `konooz-production`.
-3. Choose a region close to the Render region you will use.
-4. Click **Connect** and copy the pooled PostgreSQL connection string.
-5. Keep `sslmode=require` in the connection string.
-
-This string is the production `DATABASE_URL`. Do not put it in a repository file.
-
-## 3. Create the database schema and administrator
-
-In a new PowerShell window, substitute your real values:
+From the repository root in PowerShell, paste the same Neon connection string used previously:
 
 ```powershell
 $env:DATABASE_URL="YOUR_NEON_CONNECTION_STRING"
-$env:ADMIN_USERNAME="YOUR_ADMIN_EMAIL"
-$env:ADMIN_PASSWORD="YOUR_LONG_UNIQUE_PASSWORD"
 npm run db:migrate -w backend
-npm run seed -w backend
 Remove-Item Env:DATABASE_URL
-Remove-Item Env:ADMIN_USERNAME
-Remove-Item Env:ADMIN_PASSWORD
 ```
 
-The seed intentionally refuses to create a second administrator. Store the administrator password in a password manager.
+Do not run the administrator seed again. Your existing administrator and password remain valid.
 
-## 4. Create the Vercel frontend
+## Step 6 — create a free Cloudflare account
 
-1. Sign in at https://vercel.com/ with GitHub.
-2. Select **Add New > Project** and import the GitHub repository.
-3. Set **Root Directory** to `frontend`.
-4. Select the **Vite** framework preset.
-5. Use build command `npm run build` and output directory `dist`.
-6. Add a temporary environment variable:
+1. Open https://dash.cloudflare.com/sign-up.
+2. Create an account and verify the email address.
+3. Stay on the Free plan; do not enter payment information.
+4. In the dashboard, open **Workers & Pages** once so Cloudflare creates your `workers.dev` subdomain.
 
-   `VITE_API_URL=https://temporary.invalid/api`
+## Step 7 — authenticate Wrangler
 
-7. Apply it to Production and Preview, then deploy.
-8. Copy the stable project URL, such as `https://konooz-studio.vercel.app`.
+From the repository root:
 
-The included `frontend/vercel.json` makes direct visits to `/inventory`, `/sell`, and `/sales` load the React application.
+```powershell
+cd backend
+npx wrangler login
+```
 
-## 5. Create the Render backend from the Blueprint
+A browser opens. Sign in to Cloudflare and approve Wrangler. Return to PowerShell after it reports success.
 
-1. Sign in at https://dashboard.render.com/ with GitHub.
-2. Select **New > Blueprint**.
-3. Connect the GitHub repository.
-4. Render will detect the root `render.yaml` and create `konooz-api`.
-5. When prompted, enter:
+## Step 8 — upload the five Worker secrets
 
-   - `DATABASE_URL`: the Neon connection string.
-   - `FRONTEND_ORIGIN`: the exact stable Vercel URL, with `https://` and no trailing slash.
+Keep the PowerShell location inside `backend`.
 
-6. Render generates both JWT secrets automatically.
-7. Apply the Blueprint and wait for the deployment.
+### Database URL
 
-The Docker container automatically runs pending Prisma migrations before starting. The configured `/health` check also verifies database connectivity.
+```powershell
+npx wrangler secret put DATABASE_URL
+```
 
-## 6. Connect Vercel to Render
+At the prompt, paste the Neon pooled connection string and press Enter.
 
-After Render supplies a URL such as `https://konooz-api.onrender.com`:
+### Frontend origin
 
-1. Open `https://konooz-api.onrender.com/health` and confirm it returns `status: ok` and `database: connected`.
-2. In Vercel, open **Project > Settings > Environment Variables**.
-3. Replace `VITE_API_URL` with:
+If temporarily continuing with the existing Vercel deployment, use its exact stable URL. Do not include a trailing slash or `/api`.
 
-   `https://konooz-api.onrender.com/api`
+```powershell
+npx wrangler secret put FRONTEND_ORIGIN
+```
+
+Example value:
+
+```text
+https://konooz-studio.vercel.app
+```
+
+After Cloudflare Pages is created in Step 11, replace this secret with the final `pages.dev` URL.
+
+### JWT secrets
+
+Generate and upload two different secrets without writing them to a file:
+
+```powershell
+$accessSecret=[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(64)).ToLower()
+$accessSecret | npx wrangler secret put JWT_ACCESS_SECRET
+Remove-Variable accessSecret
+
+$refreshSecret=[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(64)).ToLower()
+$refreshSecret | npx wrangler secret put JWT_REFRESH_SECRET
+Remove-Variable refreshSecret
+```
+
+There is no need to upload `ADMIN_USERNAME` or `ADMIN_PASSWORD`. The administrator already exists in Neon.
+
+## Step 9 — deploy the API Worker
+
+Still inside `backend`, run:
+
+```powershell
+npm run deploy:cloudflare
+```
+
+Wrangler prints the public URL, resembling:
+
+```text
+https://konooz-api.YOUR-SUBDOMAIN.workers.dev
+```
+
+Copy that URL. Open its health endpoint:
+
+```text
+https://konooz-api.YOUR-SUBDOMAIN.workers.dev/health
+```
+
+The expected response is:
+
+```json
+{"status":"ok","database":"connected"}
+```
+
+## Step 10 — connect the existing Vercel frontend temporarily
+
+In Vercel:
+
+1. Open the existing project.
+2. Open **Settings > Environment Variables**.
+3. Set `VITE_API_URL` to the Worker URL followed by `/api`:
+
+   `https://konooz-api.YOUR-SUBDOMAIN.workers.dev/api`
 
 4. Apply it to Production and Preview.
 5. Open **Deployments**, select the latest deployment, and choose **Redeploy**.
 
-## 7. Confirm the allowed frontend origin
+This makes the already-created frontend operational immediately.
 
-The Render variable must exactly match the browser origin:
+## Step 11 — move the frontend to Cloudflare Pages for no-card business use
 
-```text
-FRONTEND_ORIGIN=https://konooz-studio.vercel.app
+Vercel Hobby is intended for personal, non-commercial use. For this shop system, use Cloudflare Pages Free for the final frontend.
+
+1. In Cloudflare, open **Workers & Pages**.
+2. Select **Create application > Pages > Connect to Git**.
+3. Connect GitHub and select `konooz-studio`.
+4. Use these build settings:
+
+   - Production branch: `main`
+   - Root directory: `frontend`
+   - Framework preset: `Vite`
+   - Build command: `npm run build`
+   - Build output directory: `dist`
+
+5. Add environment variable:
+
+   - Name: `VITE_API_URL`
+   - Value: `https://konooz-api.YOUR-SUBDOMAIN.workers.dev/api`
+
+6. Save and deploy.
+7. Copy the stable Pages URL, resembling:
+
+   `https://konooz-studio.pages.dev`
+
+The included `frontend/public/_redirects` makes direct React routes such as `/inventory` and `/sales` work.
+
+## Step 12 — allow the final Cloudflare Pages address
+
+Return to PowerShell inside `backend`:
+
+```powershell
+npx wrangler secret put FRONTEND_ORIGIN
 ```
 
-There must be no trailing slash and no `/api`. If the Vercel project received a different stable URL, update `FRONTEND_ORIGIN` in Render and redeploy the backend.
-
-## 8. Custom domains (optional)
-
-A suitable arrangement is:
+Paste the exact Pages address, with no trailing slash:
 
 ```text
-app.yourdomain.com -> Vercel
-api.yourdomain.com -> Render
+https://konooz-studio.pages.dev
 ```
 
-Then update and redeploy:
+Deploy again so the Worker uses that value:
+
+```powershell
+npm run deploy:cloudflare
+```
+
+The final addresses are now:
 
 ```text
-Render: FRONTEND_ORIGIN=https://app.yourdomain.com
-Vercel: VITE_API_URL=https://api.yourdomain.com/api
+Frontend: https://konooz-studio.pages.dev
+API:      https://konooz-api.YOUR-SUBDOMAIN.workers.dev
+Health:   https://konooz-api.YOUR-SUBDOMAIN.workers.dev/health
 ```
 
-## 9. Future deployments
+## Step 13 — sign in
 
-Push application changes to `main`:
+Open the Cloudflare Pages frontend and sign in with the administrator credentials created earlier. The frontend should never contain the Neon URL or JWT secrets.
+
+## Future updates
+
+Commit and push application changes:
 
 ```powershell
 git add .
@@ -137,4 +199,16 @@ git commit -m "Describe the change"
 git push
 ```
 
-Render and Vercel will deploy the new commit automatically. Commit every new directory created under `backend/prisma/migrations`; Render applies pending migrations during startup.
+Cloudflare Pages redeploys the frontend automatically. Deploy backend changes from `backend` with:
+
+```powershell
+npm run deploy:cloudflare
+```
+
+If a new directory appears under `backend/prisma/migrations`, apply it to Neon before deploying the Worker:
+
+```powershell
+$env:DATABASE_URL="YOUR_NEON_CONNECTION_STRING"
+npm run db:migrate -w backend
+Remove-Item Env:DATABASE_URL
+```

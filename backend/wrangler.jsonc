@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "konooz-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-11",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "vars": {
+    "NODE_ENV": "production",
+    "PORT": "4000"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
