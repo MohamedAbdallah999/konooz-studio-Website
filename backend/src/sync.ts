@@ -1,22 +1,19 @@
-﻿import { Router } from "express";
-import { z } from "zod";
-import { prisma } from "./db.js";
-import {
-  resolveMutation,
-  shouldRestoreRefundStock,
-} from "./syncResolution.js";
+﻿import { Router } from 'express';
+import { z } from 'zod';
+import { prisma } from './db.js';
+import { resolveMutation, shouldRestoreRefundStock, isRetryableSyncError } from './syncResolution.js';
 const router = Router();
 const optionalText = (value: unknown, max: number) => {
   if (value == null) return null;
   const text = String(value).trim();
-  if (text.length > max) throw new Error("Client detail is too long");
+  if (text.length > max) throw new Error('Client detail is too long');
   return text || null;
 };
 const mutation = z.object({
   id: z.string().uuid(),
-  tableName: z.enum(["items", "item_variants", "sales", "sale_items"]),
+  tableName: z.enum(['items', 'item_variants', 'sales', 'sale_items']),
   recordId: z.string().uuid(),
-  operation: z.enum(["insert", "update", "delete"]),
+  operation: z.enum(['insert', 'update', 'delete']),
   payload: z.record(z.unknown()),
   createdAt: z.string().datetime(),
 });
@@ -28,7 +25,7 @@ const syncedSaleLine = z
     unitPriceAtSale: z.number().finite().nonnegative().max(10_000_000),
   })
   .passthrough();
-router.post("/push", async (req, res) => {
+router.post('/push', async (req, res) => {
   const parsed = z
     .object({ mutations: z.array(mutation).max(500) })
     .parse(req.body);
@@ -49,12 +46,12 @@ router.post("/push", async (req, res) => {
         m.payload as any,
         remote as any,
       );
-      if (decision.winner === "client") {
-        const payload = { ...m.payload, syncStatus: "synced" };
+      if (decision.winner === 'client') {
+        const payload = { ...m.payload, syncStatus: 'synced' };
         delete (payload as any).variants;
-        if (m.operation === "delete")
+        if (m.operation === 'delete')
           (payload as any).deletedAt = (payload as any).updatedAt;
-        if (m.tableName === "sales" && m.operation === "insert" && !remote) {
+        if (m.tableName === 'sales' && m.operation === 'insert' && !remote) {
           const rawLines =
             Array.isArray((payload as any).items) &&
             (payload as any).items.length
@@ -62,19 +59,19 @@ router.post("/push", async (req, res) => {
               : parsed.mutations
                   .filter(
                     (x) =>
-                      x.tableName === "sale_items" &&
+                      x.tableName === 'sale_items' &&
                       (x.payload as any).saleId === m.recordId,
                   )
                   .map((x) => x.payload);
           const lines = z.array(syncedSaleLine).min(1).parse(rawLines);
           const discount = Number((payload as any).discountPercentage ?? 0);
           if (!Number.isFinite(discount) || discount < 0 || discount > 100)
-            throw new Error("Discount must be between 0 and 100");
+            throw new Error('Discount must be between 0 and 100');
           if (
             (payload as any).customerName != null &&
             String((payload as any).customerName).length > 120
           )
-            throw new Error("Customer name is too long");
+            throw new Error('Customer name is too long');
           const subtotal = lines.reduce(
             (sum: number, line: any) =>
               sum + Number(line.quantity) * Number(line.unitPriceAtSale),
@@ -108,7 +105,7 @@ router.post("/push", async (req, res) => {
             paid > (payload as any).totalAmount
           )
             throw new Error(
-              "Paid amount must be between zero and the receipt total",
+              'Paid amount must be between zero and the receipt total',
             );
           (payload as any).depositAmount = paid;
           (payload as any).paidAmount = paid;
@@ -127,7 +124,7 @@ router.post("/push", async (req, res) => {
                 },
               });
               if (!variant)
-                throw new Error("This inventory item is no longer available");
+                throw new Error('This inventory item is no longer available');
               const reserved = await tx.itemVariant.updateMany({
                 where: {
                   id: variant.id,
@@ -138,9 +135,9 @@ router.post("/push", async (req, res) => {
               });
               if (reserved.count !== 1)
                 throw new Error(
-                  "Insufficient stock for " +
+                  'Insufficient stock for ' +
                     variant.size +
-                    " / " +
+                    ' / ' +
                     variant.color,
                 );
             }
@@ -150,15 +147,15 @@ router.post("/push", async (req, res) => {
                 items: {
                   create: lines.map(({ saleId: _, ...line }: any) => ({
                     ...line,
-                    syncStatus: "synced",
+                    syncStatus: 'synced',
                   })),
                 },
               } as any,
             });
           });
         } else if (
-          m.tableName === "sales" &&
-          m.operation === "delete" &&
+          m.tableName === 'sales' &&
+          m.operation === 'delete' &&
           remote
         ) {
           delete (payload as any).items;
@@ -181,12 +178,12 @@ router.post("/push", async (req, res) => {
               });
           });
         } else if (
-          m.tableName === "sales" &&
-          m.operation === "delete" &&
+          m.tableName === 'sales' &&
+          m.operation === 'delete' &&
           !remote
         ) {
           // Cancelling a sale that never reached the server is already complete.
-        } else if (m.tableName === "items" && m.operation === "delete") {
+        } else if (m.tableName === 'items' && m.operation === 'delete') {
           delete (payload as any).items;
           const deletedAt = new Date((payload as any).deletedAt);
           await prisma.$transaction([
@@ -197,19 +194,19 @@ router.post("/push", async (req, res) => {
             }),
             prisma.itemVariant.updateMany({
               where: { itemId: m.recordId, deletedAt: null },
-              data: { deletedAt, syncStatus: "synced" },
+              data: { deletedAt, syncStatus: 'synced' },
             }),
           ]);
         } else {
           delete (payload as any).items;
-          if (m.tableName === "sales") {
+          if (m.tableName === 'sales') {
             const total = Number(
                 remote?.totalAmount ?? (payload as any).totalAmount,
               ),
               paid = Number((payload as any).paidAmount);
             if (!Number.isFinite(paid) || paid < 0 || paid > total)
               throw new Error(
-                "Paid amount must be between zero and the receipt total",
+                'Paid amount must be between zero and the receipt total',
               );
             (payload as any).totalAmount =
               remote?.totalAmount ?? (payload as any).totalAmount;
@@ -232,25 +229,26 @@ router.post("/push", async (req, res) => {
             recordId: m.recordId,
             clientPayload: m.payload as any,
             serverPayload: remote as any,
-            resolution: decision.winner + "-wins",
+            resolution: decision.winner + '-wins',
           },
         });
       results.push({
         id: m.id,
-        status: decision.conflict ? "conflict" : "synced",
+        status: decision.conflict ? 'conflict' : 'synced',
         winner: decision.winner,
       });
     } catch (error) {
       results.push({
         id: m.id,
-        status: "error",
-        message: error instanceof Error ? error.message : "Unknown error",
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        retryable: isRetryableSyncError(error),
       });
     }
   }
   res.json({ results, serverTime: new Date().toISOString() });
 });
-router.get("/pull", async (req, res) => {
+router.get('/pull', async (req, res) => {
   const since = z.coerce
       .date()
       .catch(new Date(0))

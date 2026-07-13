@@ -38,7 +38,7 @@ async function performSync(){
     const pushed=await request('/sync/push',{method:'POST',body:JSON.stringify({mutations:queue})});
     for(const result of pushed.results){
       const mutation=queue.find(entry=>entry.id===result.id);
-      if(result.status==='error'){failedMutationIds.add(result.id);errors.push(result.message??'A change could not be saved');continue}
+      if(result.status==='error'){if(result.retryable===false){await db.syncQueue.delete(result.id);forceFullPull=true;continue}failedMutationIds.add(result.id);errors.push(result.message??'A change could not be saved');continue}
       await db.syncQueue.delete(result.id);
       if(result.winner==='server')forceFullPull=true;
       if(mutation?.tableName==='items')await db.items.update(mutation.recordId,{syncStatus:result.status});

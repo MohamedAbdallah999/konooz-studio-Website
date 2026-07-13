@@ -78,4 +78,11 @@ describe('network synchronization',()=>{
     expect((await db.items.get(queued.recordId))!.deletedAt).toBe(time);
     expect(await db.syncQueue.get(queued.id)).toBeDefined();
   });
+
+  it('drops permanently rejected stale mutations and reconciles server truth',async()=>{
+    const queued=mutation();await db.syncQueue.add(queued);
+    vi.stubGlobal('fetch',vi.fn(async(input:string|URL|Request)=>String(input).includes('/sync/push')?json({results:[{id:queued.id,status:'error',message:'record no longer exists',retryable:false}]}):json(emptyPull())));
+    await expect(syncNow()).resolves.toBeUndefined();
+    expect(await db.syncQueue.get(queued.id)).toBeUndefined();
+  });
 });
