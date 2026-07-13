@@ -1,8 +1,283 @@
-﻿import { Router } from 'express';
-import { z } from 'zod';
-import { prisma } from './db.js';
-import { resolveLww } from './syncResolution.js';
-const router=Router();const optionalText=(value:unknown,max:number)=>{if(value==null)return null;const text=String(value).trim();if(text.length>max)throw new Error('Client detail is too long');return text||null;};
-const mutation=z.object({id:z.string().uuid(),tableName:z.enum(['items','item_variants','sales','sale_items']),recordId:z.string().uuid(),operation:z.enum(['insert','update','delete']),payload:z.record(z.unknown()),createdAt:z.string().datetime()});
-router.post('/push',async(req,res)=>{const parsed=z.object({mutations:z.array(mutation).max(500)}).parse(req.body);const results=[];for(const m of parsed.mutations){try{const model=({items:prisma.item,item_variants:prisma.itemVariant,sales:prisma.sale,sale_items:prisma.saleItem} as any)[m.tableName];const remote=await model.findUnique({where:{id:m.recordId}});const decision=resolveLww(m.payload as any,remote as any);if(decision.winner==='client'){const payload={...m.payload,syncStatus:'synced'};delete (payload as any).variants;if(m.operation==='delete')(payload as any).deletedAt=(payload as any).updatedAt;if(m.tableName==='sales'&&m.operation==='insert'&&!remote){const lines=Array.isArray((payload as any).items)&&(payload as any).items.length?(payload as any).items:parsed.mutations.filter(x=>x.tableName==='sale_items'&&(x.payload as any).saleId===m.recordId).map(x=>x.payload);if(!lines.length)throw new Error('A synced sale must contain at least one line');const discount=Number((payload as any).discountPercentage??0);if(!Number.isFinite(discount)||discount<0||discount>100)throw new Error('Discount must be between 0 and 100');if((payload as any).customerName!=null&&String((payload as any).customerName).length>120)throw new Error('Customer name is too long');const subtotal=lines.reduce((sum:number,line:any)=>sum+Number(line.quantity)*Number(line.unitPriceAtSale),0);(payload as any).discountPercentage=discount;(payload as any).customerName=optionalText((payload as any).customerName,120);(payload as any).customerPhone=optionalText((payload as any).customerPhone,40);(payload as any).shopName=optionalText((payload as any).shopName,120);(payload as any).customerAddress=optionalText((payload as any).customerAddress,500);(payload as any).totalAmount=Math.round(subtotal*(1-discount/100)*100)/100;const paid=Number((payload as any).paidAmount??(payload as any).totalAmount);if(!Number.isFinite(paid)||paid<0||paid>(payload as any).totalAmount)throw new Error('Paid amount must be between zero and the receipt total');(payload as any).depositAmount=paid;(payload as any).paidAmount=paid;(payload as any).paidAt=paid===(payload as any).totalAmount?((payload as any).paidAt??(payload as any).createdAt):null;delete (payload as any).items;await prisma.$transaction(async tx=>{for(const line of lines){const variant=await tx.itemVariant.findFirst({where:{id:line.itemVariantId,deletedAt:null,item:{deletedAt:null}}});if(!variant)throw new Error('This inventory item is no longer available');const reserved=await tx.itemVariant.updateMany({where:{id:variant.id,deletedAt:null,stockQuantity:{gte:Number(line.quantity)}},data:{stockQuantity:{decrement:Number(line.quantity)}}});if(reserved.count!==1)throw new Error('Insufficient stock for '+variant.color);}await tx.sale.create({data:{...payload,items:{create:lines.map(({saleId:_,...line}:any)=>({...line,syncStatus:'synced'}))}} as any});});}else if(m.tableName==='sales'&&m.operation==='delete'&&remote){const lines=Array.isArray((payload as any).items)?(payload as any).items:[];const legacyVariantUpdates=lines.some((line:any)=>parsed.mutations.some(x=>x.tableName==='item_variants'&&x.recordId===line.itemVariantId));delete (payload as any).items;await prisma.$transaction(async tx=>{await tx.sale.update({where:{id:m.recordId},data:payload as any});if(!legacyVariantUpdates)for(const line of lines)await tx.itemVariant.update({where:{id:line.itemVariantId},data:{stockQuantity:{increment:line.quantity}}});});}else if(m.tableName==='items'&&m.operation==='delete'){delete (payload as any).items;const deletedAt=new Date((payload as any).deletedAt);await prisma.$transaction([prisma.item.upsert({where:{id:m.recordId},create:payload as any,update:payload as any}),prisma.itemVariant.updateMany({where:{itemId:m.recordId,deletedAt:null},data:{deletedAt,syncStatus:'synced'}})]);}else{delete (payload as any).items;if(m.tableName==='sales'){const total=Number(remote?.totalAmount??(payload as any).totalAmount),paid=Number((payload as any).paidAmount);if(!Number.isFinite(paid)||paid<0||paid>total)throw new Error('Paid amount must be between zero and the receipt total');(payload as any).totalAmount=remote?.totalAmount??(payload as any).totalAmount;(payload as any).depositAmount=remote?.depositAmount??(payload as any).depositAmount??paid;(payload as any).paidAt=paid===total?((payload as any).paidAt??new Date()):null;}await model.upsert({where:{id:m.recordId},create:payload,update:payload});}}if(decision.conflict&&remote)await prisma.conflictLog.create({data:{tableName:m.tableName,recordId:m.recordId,clientPayload:m.payload as any,serverPayload:remote as any,resolution:decision.winner+'-wins'}});results.push({id:m.id,status:decision.conflict?'conflict':'synced',winner:decision.winner});}catch(error){results.push({id:m.id,status:'error',message:error instanceof Error?error.message:'Unknown error'});}}res.json({results,serverTime:new Date().toISOString()});});router.get('/pull',async(req,res)=>{const since=z.coerce.date().catch(new Date(0)).parse(req.query.since??0),serverTime=new Date();const [items,itemVariants,sales,saleItems]=await Promise.all([prisma.item.findMany({where:{updatedAt:{gt:since,lte:serverTime}},include:{variants:true}}),prisma.itemVariant.findMany({where:{updatedAt:{gt:since,lte:serverTime}}}),prisma.sale.findMany({where:{updatedAt:{gt:since,lte:serverTime}},include:{items:true}}),prisma.saleItem.findMany({where:{updatedAt:{gt:since,lte:serverTime}}})]);res.json({items,itemVariants,sales,saleItems,serverTime:serverTime.toISOString()});});
+﻿import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "./db.js";
+import {
+  resolveMutation,
+  shouldRestoreRefundStock,
+} from "./syncResolution.js";
+const router = Router();
+const optionalText = (value: unknown, max: number) => {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (text.length > max) throw new Error("Client detail is too long");
+  return text || null;
+};
+const mutation = z.object({
+  id: z.string().uuid(),
+  tableName: z.enum(["items", "item_variants", "sales", "sale_items"]),
+  recordId: z.string().uuid(),
+  operation: z.enum(["insert", "update", "delete"]),
+  payload: z.record(z.unknown()),
+  createdAt: z.string().datetime(),
+});
+const syncedSaleLine = z
+  .object({
+    id: z.string().uuid().optional(),
+    itemVariantId: z.string().uuid(),
+    quantity: z.number().int().positive().max(1_000),
+    unitPriceAtSale: z.number().finite().nonnegative().max(10_000_000),
+  })
+  .passthrough();
+router.post("/push", async (req, res) => {
+  const parsed = z
+    .object({ mutations: z.array(mutation).max(500) })
+    .parse(req.body);
+  const results = [];
+  for (const m of parsed.mutations) {
+    try {
+      const model = (
+        {
+          items: prisma.item,
+          item_variants: prisma.itemVariant,
+          sales: prisma.sale,
+          sale_items: prisma.saleItem,
+        } as any
+      )[m.tableName];
+      const remote = await model.findUnique({ where: { id: m.recordId } });
+      const decision = resolveMutation(
+        m.operation,
+        m.payload as any,
+        remote as any,
+      );
+      if (decision.winner === "client") {
+        const payload = { ...m.payload, syncStatus: "synced" };
+        delete (payload as any).variants;
+        if (m.operation === "delete")
+          (payload as any).deletedAt = (payload as any).updatedAt;
+        if (m.tableName === "sales" && m.operation === "insert" && !remote) {
+          const rawLines =
+            Array.isArray((payload as any).items) &&
+            (payload as any).items.length
+              ? (payload as any).items
+              : parsed.mutations
+                  .filter(
+                    (x) =>
+                      x.tableName === "sale_items" &&
+                      (x.payload as any).saleId === m.recordId,
+                  )
+                  .map((x) => x.payload);
+          const lines = z.array(syncedSaleLine).min(1).parse(rawLines);
+          const discount = Number((payload as any).discountPercentage ?? 0);
+          if (!Number.isFinite(discount) || discount < 0 || discount > 100)
+            throw new Error("Discount must be between 0 and 100");
+          if (
+            (payload as any).customerName != null &&
+            String((payload as any).customerName).length > 120
+          )
+            throw new Error("Customer name is too long");
+          const subtotal = lines.reduce(
+            (sum: number, line: any) =>
+              sum + Number(line.quantity) * Number(line.unitPriceAtSale),
+            0,
+          );
+          (payload as any).discountPercentage = discount;
+          (payload as any).customerName = optionalText(
+            (payload as any).customerName,
+            120,
+          );
+          (payload as any).customerPhone = optionalText(
+            (payload as any).customerPhone,
+            40,
+          );
+          (payload as any).shopName = optionalText(
+            (payload as any).shopName,
+            120,
+          );
+          (payload as any).customerAddress = optionalText(
+            (payload as any).customerAddress,
+            500,
+          );
+          (payload as any).totalAmount =
+            Math.round(subtotal * (1 - discount / 100) * 100) / 100;
+          const paid = Number(
+            (payload as any).paidAmount ?? (payload as any).totalAmount,
+          );
+          if (
+            !Number.isFinite(paid) ||
+            paid < 0 ||
+            paid > (payload as any).totalAmount
+          )
+            throw new Error(
+              "Paid amount must be between zero and the receipt total",
+            );
+          (payload as any).depositAmount = paid;
+          (payload as any).paidAmount = paid;
+          (payload as any).paidAt =
+            paid === (payload as any).totalAmount
+              ? ((payload as any).paidAt ?? (payload as any).createdAt)
+              : null;
+          delete (payload as any).items;
+          await prisma.$transaction(async (tx) => {
+            for (const line of lines) {
+              const variant = await tx.itemVariant.findFirst({
+                where: {
+                  id: line.itemVariantId,
+                  deletedAt: null,
+                  item: { deletedAt: null },
+                },
+              });
+              if (!variant)
+                throw new Error("This inventory item is no longer available");
+              const reserved = await tx.itemVariant.updateMany({
+                where: {
+                  id: variant.id,
+                  deletedAt: null,
+                  stockQuantity: { gte: Number(line.quantity) },
+                },
+                data: { stockQuantity: { decrement: Number(line.quantity) } },
+              });
+              if (reserved.count !== 1)
+                throw new Error(
+                  "Insufficient stock for " +
+                    variant.size +
+                    " / " +
+                    variant.color,
+                );
+            }
+            await tx.sale.create({
+              data: {
+                ...payload,
+                items: {
+                  create: lines.map(({ saleId: _, ...line }: any) => ({
+                    ...line,
+                    syncStatus: "synced",
+                  })),
+                },
+              } as any,
+            });
+          });
+        } else if (
+          m.tableName === "sales" &&
+          m.operation === "delete" &&
+          remote
+        ) {
+          delete (payload as any).items;
+          await prisma.$transaction(async (tx) => {
+            const current = await tx.sale.findUniqueOrThrow({
+              where: { id: m.recordId },
+            });
+            if (!shouldRestoreRefundStock(current.deletedAt)) return;
+            const canonicalLines = await tx.saleItem.findMany({
+              where: { saleId: m.recordId },
+            });
+            await tx.sale.update({
+              where: { id: m.recordId },
+              data: payload as any,
+            });
+            for (const line of canonicalLines)
+              await tx.itemVariant.update({
+                where: { id: line.itemVariantId },
+                data: { stockQuantity: { increment: line.quantity } },
+              });
+          });
+        } else if (
+          m.tableName === "sales" &&
+          m.operation === "delete" &&
+          !remote
+        ) {
+          // Cancelling a sale that never reached the server is already complete.
+        } else if (m.tableName === "items" && m.operation === "delete") {
+          delete (payload as any).items;
+          const deletedAt = new Date((payload as any).deletedAt);
+          await prisma.$transaction([
+            prisma.item.upsert({
+              where: { id: m.recordId },
+              create: payload as any,
+              update: payload as any,
+            }),
+            prisma.itemVariant.updateMany({
+              where: { itemId: m.recordId, deletedAt: null },
+              data: { deletedAt, syncStatus: "synced" },
+            }),
+          ]);
+        } else {
+          delete (payload as any).items;
+          if (m.tableName === "sales") {
+            const total = Number(
+                remote?.totalAmount ?? (payload as any).totalAmount,
+              ),
+              paid = Number((payload as any).paidAmount);
+            if (!Number.isFinite(paid) || paid < 0 || paid > total)
+              throw new Error(
+                "Paid amount must be between zero and the receipt total",
+              );
+            (payload as any).totalAmount =
+              remote?.totalAmount ?? (payload as any).totalAmount;
+            (payload as any).depositAmount =
+              remote?.depositAmount ?? (payload as any).depositAmount ?? paid;
+            (payload as any).paidAt =
+              paid === total ? ((payload as any).paidAt ?? new Date()) : null;
+          }
+          await model.upsert({
+            where: { id: m.recordId },
+            create: payload,
+            update: payload,
+          });
+        }
+      }
+      if (decision.conflict && remote)
+        await prisma.conflictLog.create({
+          data: {
+            tableName: m.tableName,
+            recordId: m.recordId,
+            clientPayload: m.payload as any,
+            serverPayload: remote as any,
+            resolution: decision.winner + "-wins",
+          },
+        });
+      results.push({
+        id: m.id,
+        status: decision.conflict ? "conflict" : "synced",
+        winner: decision.winner,
+      });
+    } catch (error) {
+      results.push({
+        id: m.id,
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+  res.json({ results, serverTime: new Date().toISOString() });
+});
+router.get("/pull", async (req, res) => {
+  const since = z.coerce
+      .date()
+      .catch(new Date(0))
+      .parse(req.query.since ?? 0),
+    serverTime = new Date();
+  const [items, itemVariants, sales, saleItems] = await Promise.all([
+    prisma.item.findMany({
+      where: { updatedAt: { gt: since, lte: serverTime } },
+      include: { variants: true },
+    }),
+    prisma.itemVariant.findMany({
+      where: { updatedAt: { gt: since, lte: serverTime } },
+    }),
+    prisma.sale.findMany({
+      where: { updatedAt: { gt: since, lte: serverTime } },
+      include: { items: true },
+    }),
+    prisma.saleItem.findMany({
+      where: { updatedAt: { gt: since, lte: serverTime } },
+    }),
+  ]);
+  res.json({
+    items,
+    itemVariants,
+    sales,
+    saleItems,
+    serverTime: serverTime.toISOString(),
+  });
+});
 export default router;

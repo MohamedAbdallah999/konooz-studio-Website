@@ -1,2 +1,4 @@
-import {describe,it,expect} from 'vitest';import {resolveLww} from '../src/syncResolution.js';
+import {describe,it,expect} from 'vitest';import {resolveLww,resolveMutation,shouldRestoreRefundStock} from '../src/syncResolution.js';
 describe('last-write-wins sync',()=>{it('accepts new client records',()=>expect(resolveLww({updatedAt:'2026-01-01'},null)).toEqual({winner:'client',conflict:false}));it('keeps the newest server version and flags conflict',()=>expect(resolveLww({updatedAt:'2026-01-01'},{updatedAt:'2026-01-02'})).toEqual({winner:'server',conflict:true}));it('uses client version when newer',()=>expect(resolveLww({updatedAt:'2026-01-03'},{updatedAt:'2026-01-02'})).toEqual({winner:'client',conflict:true}));});
+describe('delete sync',()=>{it('keeps an explicit deletion authoritative despite clock skew',()=>expect(resolveMutation('delete',{updatedAt:'2026-01-01'},{updatedAt:'2026-01-02'})).toEqual({winner:'client',conflict:true}))});
+describe('refund sync',()=>{it('restores stock only on the first refund attempt',()=>{expect(shouldRestoreRefundStock(null)).toBe(true);expect(shouldRestoreRefundStock('2026-01-01')).toBe(false)})});

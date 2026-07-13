@@ -21,6 +21,11 @@ export const prisma=new Proxy({} as PrismaClient,{
   },
 });
 
-export const prismaContext:RequestHandler=(_req,_res,next)=>{
-  requestClient.run(createClient(),next);
+export const prismaContext:RequestHandler=(_req,res,next)=>{
+  const client=createClient();
+  let closed=false;
+  const close=()=>{if(closed)return;closed=true;void client.$disconnect().catch(error=>console.error(JSON.stringify({event:'database_disconnect_error',message:error instanceof Error?error.message:'Unknown error'})))};
+  res.once('finish',close);
+  res.once('close',close);
+  requestClient.run(client,next);
 };

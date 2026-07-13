@@ -67,7 +67,7 @@ router.post('/', validate(sale), async (req, res) => {
         data: { stockQuantity: { decrement: line.quantity } },
       });
       if (reserved.count !== 1) {
-        throw Object.assign(new Error(`Insufficient stock for ${variant.color}`), { status: 409 });
+        throw Object.assign(new Error(`Insufficient stock for ${variant.size} / ${variant.color}`), { status: 409 });
       }
       total += line.quantity * line.unitPriceAtSale;
     }

@@ -1,4 +1,4 @@
-# Konooz â€” The Style You Love
+# Konooz - The Style You Love
 
 Production-oriented offline-first inventory and point-of-sale system for a single-admin dress shop. This is a new build at `konooz-studio`; the pre-existing `konooz` repository was not modified.
 
@@ -23,6 +23,6 @@ Never commit `.env`. The frontend receives only `VITE_API_URL`. Production uses 
 Use Neon Free for PostgreSQL, Cloudflare Workers Free for the Express API, and Cloudflare Pages Free for the frontend. The Worker uses Cloudflare's Node.js compatibility layer and Prisma's PostgreSQL driver adapter. Production secrets are uploaded with Wrangler and never committed. Follow `DEPLOYMENT.md` for the exact dashboard and PowerShell steps.
 ## Printer and offline behavior
 
-Install the receipt printer with its OS driver. From a receipt choose Print, select the system printer, disable browser headers/footers, and use an 80 mm roll. â€œSave PDFâ€ uses the browser's PDF destination. Browsers intentionally cannot silently select printers without kiosk software.
+Install the receipt printer with its OS driver. From a receipt choose Print, select the system printer, disable browser headers/footers, and use an 80 mm roll. "Save PDF" uses the browser's PDF destination. Browsers intentionally cannot silently select printers without kiosk software.
 
 The installed PWA reads/writes IndexedDB. Mutations enter `sync_queue` in timestamp order; reconnect pushes then pulls since `lastSync`. Newest `updated_at` wins, unequal versions are recorded in `conflict_logs`, and deletes use tombstones. Keep device time automatic. Multiple simultaneous admins would require version-based/domain merge instead of LWW.

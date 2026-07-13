@@ -7,6 +7,7 @@ import { validate } from './middleware.js';
 const router = Router();
 const variant = z.object({
   id: z.string().uuid().optional(),
+  size: z.string().trim().min(1).max(80),
   color: z.string().trim().min(1).max(50),
   stockQuantity: z.number().int().min(0).max(100000),
 });
@@ -18,17 +19,16 @@ const item = z.object({
     value => /^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(value) || /^https?:\/\//i.test(value),
     'Photo must be an uploaded image or a valid web URL',
   ).nullish(),
-  size: z.string().max(80).nullish(),
   material: z.string().max(500).nullish(),
   variants: z.array(variant).min(1),
 }).superRefine((value, context) => {
-  const colors = new Set<string>();
+  const combinations = new Set<string>();
   value.variants.forEach((entry, index) => {
-    const normalized = entry.color.toLocaleLowerCase();
-    if (colors.has(normalized)) {
-      context.addIssue({ code: 'custom', path: ['variants', index, 'color'], message: 'Each colour must be unique' });
+    const normalized = `${entry.size.toLocaleLowerCase()}\u0000${entry.color.toLocaleLowerCase()}`;
+    if (combinations.has(normalized)) {
+      context.addIssue({ code: 'custom', path: ['variants', index], message: 'Each size and colour combination must be unique' });
     }
-    colors.add(normalized);
+    combinations.add(normalized);
   });
 });
 
@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
         OR: [
           { modelNumber: { contains: q, mode: 'insensitive' } },
           { material: { contains: q, mode: 'insensitive' } },
-          { size: { contains: q, mode: 'insensitive' } },
+          { variants: { some: { size: { contains: q, mode: 'insensitive' }, deletedAt: null } } },
           { variants: { some: { color: { contains: q, mode: 'insensitive' }, deletedAt: null } } },
         ],
       }] : [],
@@ -80,16 +80,16 @@ router.put('/:id', validate(item), async (req, res) => {
       if (entry.id) {
         await tx.itemVariant.update({
           where: { id: entry.id, itemId: id },
-          data: { color: entry.color, stockQuantity: entry.stockQuantity, deletedAt: null, syncStatus: 'synced' },
+          data: { size: entry.size, color: entry.color, stockQuantity: entry.stockQuantity, deletedAt: null, syncStatus: 'synced' },
         });
       } else {
         const reusable = existing.variants.find(candidate =>
-          candidate.deletedAt && candidate.color.toLocaleLowerCase() === entry.color.toLocaleLowerCase()
+          candidate.deletedAt && candidate.size.toLocaleLowerCase() === entry.size.toLocaleLowerCase() && candidate.color.toLocaleLowerCase() === entry.color.toLocaleLowerCase()
         );
         if (reusable) {
           await tx.itemVariant.update({
             where: { id: reusable.id },
-            data: { color: entry.color, stockQuantity: entry.stockQuantity, deletedAt: null, syncStatus: 'synced' },
+            data: { size: entry.size, color: entry.color, stockQuantity: entry.stockQuantity, deletedAt: null, syncStatus: 'synced' },
           });
         } else {
           await tx.itemVariant.create({ data: { ...entry, itemId: id } });

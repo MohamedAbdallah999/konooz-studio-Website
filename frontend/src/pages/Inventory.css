@@ -1,0 +1,2 @@
+.variant-row{grid-template-columns:1fr 1fr 110px 35px}
+@media(max-width:600px){.variant-row{grid-template-columns:1fr 1fr 80px 30px}}

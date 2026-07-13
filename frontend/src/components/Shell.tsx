@@ -1,7 +1,7 @@
 import {NavLink,Outlet,useNavigate} from 'react-router-dom';
 import {LayoutDashboard,Package,ReceiptText,ShoppingBag,LogOut,Wifi,WifiOff,RefreshCw} from 'lucide-react';
 import {motion} from 'framer-motion';
-import {logout,syncNow} from '../api';
+import {logout} from '../api';
 import {useSync} from '../hooks/useSync';
 
 const nav=[[LayoutDashboard,'Overview','/'],[Package,'Inventory','/inventory'],[ShoppingBag,'New sale','/sell'],[ReceiptText,'Sales','/sales']] as const;
@@ -15,7 +15,7 @@ export function Shell(){
       <button className="logout" onClick={signOut}><LogOut size={18}/> Sign out</button>
     </aside>
     <main>
-      <header className="topbar"><div><p className="eyebrow">ATELIER OPERATIONS</p><h1>Good Morning, Dewidar</h1></div><button className={`sync-pill ${sync.online?'online':'offline'}`} onClick={()=>syncNow()} aria-label={sync.syncing?'Syncing':sync.online?'Sync now':'Working offline'}>{sync.syncing?<RefreshCw className="spin" size={15}/>:sync.online?<Wifi size={15}/>:<WifiOff size={15}/>}<span>{sync.syncing?'Syncing':sync.online?'Cloud ready':'Working offline'}</span></button></header>
+      <header className="topbar"><div><p className="eyebrow">ATELIER OPERATIONS</p><h1>Good Morning, Dewidar</h1></div><button className={`sync-pill ${sync.error?'offline':sync.online?'online':'offline'}`} onClick={()=>dispatchEvent(new Event('konooz:sync-request'))} title={sync.error||undefined} aria-label={sync.syncing?'Syncing':sync.error||sync.online?'Sync now':'Working offline'}>{sync.syncing?<RefreshCw className="spin" size={15}/>:sync.online&&!sync.error?<Wifi size={15}/>:<WifiOff size={15}/>}<span>{sync.syncing?'Syncing':sync.error?'Sync issue':sync.online?'Cloud ready':'Working offline'}</span></button></header>
       <motion.div className="page" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.28}}><Outlet/></motion.div>
     </main>
     <nav className="mobile-nav" aria-label="Main navigation">

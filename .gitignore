@@ -10,5 +10,6 @@ coverage/
 *.db
 .DS_Store
 .vite/
+.vercel/
 playwright-report/
 test-results/
