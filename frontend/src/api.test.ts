@@ -39,6 +39,19 @@ describe('network synchronization',()=>{
     expect(await db.syncQueue.count()).toBe(0);
   });
 
+  it('splits sync batches by encoded request size',async()=>{
+    const mutations=[mutation(),mutation()];for(const entry of mutations)entry.payload={...entry.payload,photoUrl:'x'.repeat(700_000)};await db.syncQueue.bulkAdd(mutations);
+    const batchSizes:number[]=[];
+    vi.stubGlobal('fetch',vi.fn(async(input:string|URL|Request,init?:RequestInit)=>{
+      const url=String(input);
+      if(url.includes('/sync/push')){const body=JSON.parse(String(init?.body));batchSizes.push(body.mutations.length);return json({results:body.mutations.map((entry:QueueMutation)=>({id:entry.id,status:'synced',winner:'client'}))})}
+      if(url.includes('/sync/pull'))return json(emptyPull());
+      throw new Error('Unexpected request');
+    }));
+    await syncNow();
+    expect(batchSizes).toEqual([1,1]);
+  });
+
   it('immediately reruns when a change arrives during an active pull',async()=>{
     await db.syncQueue.add(mutation());
     let releasePull!:()=>void,signalPull!:()=>void,pushes=0;

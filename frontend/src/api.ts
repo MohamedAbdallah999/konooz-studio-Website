@@ -25,6 +25,7 @@ export const isAuthenticated=()=>Boolean(token);
 const pendingKey=(table:string,id:string)=>`${table}:${id}`;
 const variantOf=(value:Variant):Variant=>({...value,size:value.size?.trim()||'One size',stockQuantity:Number(value.stockQuantity),syncStatus:'synced'});
 const lineOf=(value:SaleLine):SaleLine=>({...value,quantity:Number(value.quantity),unitPriceAtSale:Number(value.unitPriceAtSale),syncStatus:'synced'});
+const syncBatch=(queue:QueueMutation[])=>{const batch:QueueMutation[]=[];let bytes=16;const encoder=new TextEncoder();for(const entry of queue){const entryBytes=encoder.encode(JSON.stringify(entry)).byteLength+1;if(batch.length&&bytes+entryBytes>1_000_000)break;batch.push(entry);bytes+=entryBytes;if(batch.length===500)break}return batch};
 
 async function performSync(){
   if(!navigator.onLine||!token)return;
@@ -32,7 +33,7 @@ async function performSync(){
   const errors:string[]=[];
   const failedMutationIds=new Set<string>();
   while(navigator.onLine){
-    const queue=(await db.syncQueue.orderBy('createdAt').toArray()).filter(entry=>!failedMutationIds.has(entry.id)).slice(0,500);
+    const queue=syncBatch((await db.syncQueue.orderBy('createdAt').toArray()).filter(entry=>!failedMutationIds.has(entry.id)));
     if(!queue.length)break;
     const pushed=await request('/sync/push',{method:'POST',body:JSON.stringify({mutations:queue})});
     for(const result of pushed.results){
