@@ -26,7 +26,6 @@ const pendingKey=(table:string,id:string)=>`${table}:${id}`;
 const variantOf=(value:Variant):Variant=>({...value,size:value.size?.trim()||'One size',stockQuantity:Number(value.stockQuantity),syncStatus:'synced'});
 const lineOf=(value:SaleLine):SaleLine=>({...value,quantity:Number(value.quantity),unitPriceAtSale:Number(value.unitPriceAtSale),syncStatus:'synced'});
 const syncBatch=(queue:QueueMutation[])=>{const batch:QueueMutation[]=[];let bytes=16;const encoder=new TextEncoder();for(const entry of queue){const entryBytes=encoder.encode(JSON.stringify(entry)).byteLength+1;if(batch.length&&bytes+entryBytes>1_000_000)break;batch.push(entry);bytes+=entryBytes;if(batch.length===500)break}return batch};
-const yieldToPage=()=>new Promise<void>(resolve=>setTimeout(resolve,0));
 
 async function performSync(){
   if(!navigator.onLine||!token)return;
@@ -47,7 +46,6 @@ async function performSync(){
       if(mutation?.tableName==='sales')await db.sales.update(mutation.recordId,{syncStatus:result.status});
       if(mutation?.tableName==='sale_items')await db.saleItems.update(mutation.recordId,{syncStatus:result.status});
     }
-    await yieldToPage();
   }
   const remaining=await db.syncQueue.toArray();
   const pending=new Set(remaining.map((entry:QueueMutation)=>pendingKey(entry.tableName,entry.recordId)));
