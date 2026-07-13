@@ -1,2 +1,3 @@
-.variant-row{grid-template-columns:1fr 1fr 110px 35px}
-@media(max-width:600px){.variant-row{grid-template-columns:1fr 1fr 80px 30px}}
+.variant-row{grid-template-columns:minmax(110px,1fr) minmax(110px,1fr) 170px 35px}
+.variant-row input:nth-child(3){font-size:17px;font-weight:700;text-align:center}
+@media(max-width:600px){.variant-row{grid-template-columns:1fr 1fr 30px}.variant-row input:nth-child(3){grid-column:1/3;grid-row:2;font-size:16px;padding-inline:8px}.variant-row button{grid-column:3;grid-row:1/3}}
