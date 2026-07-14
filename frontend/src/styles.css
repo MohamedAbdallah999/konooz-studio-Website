@@ -106,3 +106,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 @media(max-width:900px){.sell-layout{grid-template-columns:1fr}.basket{position:relative;top:auto}.sell-list article{grid-template-columns:72px minmax(120px,1fr)}.variant-buttons{grid-column:1/-1;max-width:none;justify-content:flex-start}.topbar{backdrop-filter:blur(14px);background:#fffdf8eb}}
 @media(max-width:600px){.page{padding-inline:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}.sell-list{gap:12px}.sell-list article{grid-template-columns:62px minmax(0,1fr);border-radius:8px}.variant-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.variant-buttons button{width:100%;min-width:0}.basket{border-radius:10px}.inventory-grid .item-card{border-radius:8px}.modal{box-shadow:0 -20px 60px #0004}.section-head>div{min-width:0}.section-head p:last-child{font-size:12px}.topbar h1{max-width:55vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 @media(max-width:390px){.variant-buttons{grid-template-columns:1fr}.sell-list article{grid-template-columns:54px minmax(0,1fr)}.model-badge{height:56px}.basket-lines article{grid-template-columns:1fr auto}.basket-lines article>label{grid-column:1/-1}.basket-lines .remove{grid-column:2;grid-row:1/3}}
+
+/* Inventory card edit control */
+.item-art button{right:12px;top:12px;width:38px;height:38px;padding:0;border:1px solid #ffffff90;background:#fffdf8e8;color:var(--espresso);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:0;box-shadow:0 8px 22px #17151124;backdrop-filter:blur(8px)}
+.item-art button svg{display:block;flex:none;margin:0}
+.item-art button:hover{background:var(--gold);border-color:var(--champagne);color:#fff;transform:translateY(-2px) rotate(-4deg) scale(1.05);box-shadow:0 11px 25px #17151138}
+.item-art button:active{transform:scale(.94)}
