@@ -16,6 +16,7 @@ const allowedOrigin = (origin: string | undefined) => {
     const hostname = new URL(origin).hostname;
     return origin.startsWith('https://') && (
       hostname === 'konooz-studio.vercel.app' ||
+      hostname === 'konooz-studio-website-frontend.vercel.app' ||
       (hostname.startsWith('frontend-') && hostname.endsWith('-mohameds-projects-c959c00f.vercel.app'))
     );
   } catch { return false; }
