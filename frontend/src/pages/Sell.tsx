@@ -118,16 +118,9 @@ export function Sell() {
             placeholder='Model or colour…'
           />
         </div>
-        <motion.div className='sell-list' layout>
-          {results.map((item,index) => (
-            <motion.article
-              key={item.id}
-              layout
-              initial={{opacity:0,x:-28}}
-              animate={{opacity:1,x:0}}
-              transition={{duration:.48,delay:Math.min(index*.045,.28),ease:[.22,1,.36,1]}}
-              whileHover={{y:-1}}
-            >
+        <div className='sell-list'>
+          {results.map((item) => (
+            <article key={item.id}>
               <div className='model-badge'>
                 {item.photoUrl ? (
                   <img src={item.photoUrl} alt={`Model ${item.modelNumber}`} />
@@ -158,9 +151,9 @@ export function Sell() {
                     </button>
                   )})}
               </div>
-            </motion.article>
+            </article>
           ))}
-        </motion.div>
+        </div>
       </section>
       <aside className='basket'>
         <header>
