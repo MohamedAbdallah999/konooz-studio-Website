@@ -4,6 +4,7 @@ import { Search, Minus, Plus, ShoppingBag, X, Check } from 'lucide-react';
 import { db, createSale } from '../db';
 import type { Item, Variant, Sale } from '../types';
 import { Receipt } from './Receipt';
+import { colorSwatch } from '../colorSwatch';
 
 type Cart = { item: Item; variant: Variant; quantity: number; price: number };
 export function Sell() {
@@ -114,7 +115,13 @@ export function Sell() {
         <div className='sell-list'>
           {results.map((item) => (
             <article key={item.id}>
-              <div className='model-badge'>{item.modelNumber.slice(0, 2)}</div>
+              <div className='model-badge'>
+                {item.photoUrl ? (
+                  <img src={item.photoUrl} alt={`Model ${item.modelNumber}`} />
+                ) : (
+                  <span>{item.modelNumber.slice(0, 2).toUpperCase()}</span>
+                )}
+              </div>
               <div>
                 <small>MODEL</small>
                 <h3>{item.modelNumber}</h3>
@@ -126,6 +133,11 @@ export function Sell() {
                   .map((v) => (
                     <button key={v.id} onClick={() => add(item, v)}>
                       <span>
+                        <i
+                          className='color-swatch'
+                          style={{ backgroundColor: colorSwatch(v.color) }}
+                          aria-hidden='true'
+                        />
                         {v.size} / {v.color}
                       </span>
                       <small>{v.stockQuantity} left</small>
@@ -158,6 +170,11 @@ export function Sell() {
                 <div>
                   <b>{x.item.modelNumber}</b>
                   <span>
+                    <i
+                      className='color-swatch'
+                      style={{ backgroundColor: colorSwatch(x.variant.color) }}
+                      aria-hidden='true'
+                    />
                     {x.variant.size} / {x.variant.color}
                   </span>
                 </div>

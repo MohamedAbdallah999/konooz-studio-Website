@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db, deleteItem, now, saveItem, uid } from '../db';
 import type { Item, Variant } from '../types';
 import { optimizeModelPhoto } from '../image';
+import { colorSwatch } from '../colorSwatch';
 import './Inventory.css';
 
 const newVariant = (itemId: string): Variant => ({
@@ -145,6 +146,11 @@ export function Inventory() {
               <div className='chips'>
                 {item.variants.map((v) => (
                   <span key={v.id}>
+                    <i
+                      className='color-swatch'
+                      style={{ backgroundColor: colorSwatch(v.color) }}
+                      aria-label={`${v.color} colour`}
+                    />
                     {v.size} / {v.color} - {v.stockQuantity}
                   </span>
                 ))}
