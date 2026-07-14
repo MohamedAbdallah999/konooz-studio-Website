@@ -9,14 +9,28 @@ const refreshAccessToken=()=>activeRefresh??=(async()=>{
   token=next;sessionStorage.setItem('accessToken',next);return next;
 })().finally(()=>{activeRefresh=null});
 
+const delay=(milliseconds:number)=>new Promise(resolve=>setTimeout(resolve,milliseconds));
+async function resilientFetch(url:string,init:RequestInit){
+  const retryable=(init.method??'GET').toUpperCase()==='GET';
+  for(let attempt=0;;attempt++){
+    try{
+      const response=await fetch(url,{...init,signal:init.signal??AbortSignal.timeout(15_000)});
+      if(!retryable||attempt===2||(response.status!==429&&response.status<500))return response;
+    }catch(error){
+      if(!retryable||attempt===2)throw error;
+    }
+    await delay(500*2**attempt+Math.floor(Math.random()*250));
+  }
+}
+
 export async function request(path:string,init:RequestInit={}){
   if(typeof navigator!=='undefined'&&!navigator.onLine)throw new Error('Internet connection required. No changes were saved.');
   const headers=new Headers(init.headers);headers.set('Content-Type','application/json');
   if(token)headers.set('Authorization',`Bearer ${token}`);
-  let response=await fetch(base+path,{...init,headers,credentials:'include',cache:'no-store'});
+  let response=await resilientFetch(base+path,{...init,headers,credentials:'include',cache:'no-store'});
   if(response.status===401&&path!=='/auth/refresh'){
     const refreshed=await refreshAccessToken();
-    if(refreshed){headers.set('Authorization',`Bearer ${refreshed}`);response=await fetch(base+path,{...init,headers,credentials:'include',cache:'no-store'})}
+    if(refreshed){headers.set('Authorization',`Bearer ${refreshed}`);response=await resilientFetch(base+path,{...init,headers,credentials:'include',cache:'no-store'})}
   }
   if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error??'Request failed');
   return response.status===204?null:response.json();

@@ -23,11 +23,14 @@ const variantOf=(value:Variant):Variant=>({...value,size:value.size?.trim()||'On
 const lineOf=(value:SaleLine):SaleLine=>({...value,quantity:Number(value.quantity),unitPriceAtSale:Number(value.unitPriceAtSale),syncStatus:'synced'});
 const saleOf=(raw:Sale):Sale=>({...raw,totalAmount:Number(raw.totalAmount),depositAmount:Number(raw.depositAmount??raw.totalAmount),paidAmount:Number(raw.paidAmount??raw.totalAmount),discountPercentage:Number(raw.discountPercentage??0),items:(raw.items??[]).map(lineOf),syncStatus:'synced'});
 let activeRefresh:Promise<void>|null=null;
+let stateVersion='';
 
 export async function refreshServerState(force=false):Promise<void>{
   if(activeRefresh){await activeRefresh;if(!force)return}
   activeRefresh=(async()=>{
-    const {items:rawItems,sales:rawSales}=await request('/state') as {items:Item[];sales:Sale[]};
+    const state=await request(`/state${stateVersion?`?version=${encodeURIComponent(stateVersion)}`:''}`) as {unchanged?:boolean;version:string;items?:Item[];sales?:Sale[]};
+    if(state.unchanged){stateVersion=state.version;return}
+    const rawItems=state.items??[],rawSales=state.sales??[];stateVersion=state.version;
     const variants:Variant[]=[];
     const items=rawItems.map(raw=>{const normalized=(raw.variants??[]).map(variantOf);variants.push(...normalized);return{...raw,price:Number(raw.price),variants:normalized,syncStatus:'synced' as const}});
     const sales=rawSales.map(saleOf),saleItems=sales.flatMap(sale=>sale.items);

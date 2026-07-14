@@ -15,7 +15,7 @@ export function Shell(){
       <button className="logout" onClick={signOut}><LogOut size={18}/> Sign out</button>
     </aside>
     <main>
-      <header className="topbar"><div><p className="eyebrow">ATELIER OPERATIONS</p><h1>Good Morning, Dewidar</h1></div><button className={`sync-pill ${sync.error?'offline':sync.online?'online':'offline'}`} onClick={()=>dispatchEvent(new Event('konooz:sync-request'))} title={sync.error||undefined} aria-label={sync.syncing?'Refreshing data':sync.error||sync.online?'Refresh data':'No connection'}>{sync.syncing?<RefreshCw className="spin" size={15}/>:sync.online&&!sync.error?<Wifi size={15}/>:<WifiOff size={15}/>}<span>{sync.syncing?'Refreshing':sync.error?'Connection issue':sync.online?'Live data':'No connection'}</span></button></header>
+      <header className="topbar"><div><p className="eyebrow">ATELIER OPERATIONS</p><h1>Good Morning, Dewidar</h1></div><button className={`sync-pill ${sync.online?'online':'offline'}`} onClick={()=>dispatchEvent(new Event('konooz:sync-request'))} aria-label={sync.syncing?'Refreshing data':sync.online?'Refresh data':'Browser is offline'}>{sync.syncing?<RefreshCw className="spin" size={15}/>:sync.online?<Wifi size={15}/>:<WifiOff size={15}/>}<span>{sync.syncing?'Refreshing':sync.online?'Live data':'No internet'}</span></button></header>
       <motion.div className="page" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.28}}><Outlet/></motion.div>
     </main>
     <nav className="mobile-nav" aria-label="Main navigation">
