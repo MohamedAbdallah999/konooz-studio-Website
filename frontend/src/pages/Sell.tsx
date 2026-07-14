@@ -5,6 +5,7 @@ import { db, createSale } from '../db';
 import type { Item, Variant, Sale } from '../types';
 import { Receipt } from './Receipt';
 import { colorSwatch } from '../colorSwatch';
+import { AnimatePresence, motion } from 'framer-motion';
 
 type Cart = { item: Item; variant: Variant; quantity: number; price: number };
 export function Sell() {
@@ -31,9 +32,14 @@ export function Sell() {
           v.size.toLowerCase().includes(q.toLowerCase()),
       ),
   );
+  const inCart = (variantId: string) =>
+    cart.find((line) => line.variant.id === variantId)?.quantity ?? 0;
+  const remaining = (variant: Variant) =>
+    Math.max(0, variant.stockQuantity - inCart(variant.id));
   const add = (item: Item, v: Variant) =>
     setCart((c) => {
       const n = c.find((x) => x.variant.id === v.id);
+      if ((n?.quantity ?? 0) >= v.stockQuantity) return c;
       return n
         ? c.map((x) =>
             x === n
@@ -112,9 +118,9 @@ export function Sell() {
             placeholder='Model or colour…'
           />
         </div>
-        <div className='sell-list'>
+        <motion.div className='sell-list' layout>
           {results.map((item) => (
-            <article key={item.id}>
+            <motion.article key={item.id} layout initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} whileHover={{y:-3}}>
               <div className='model-badge'>
                 {item.photoUrl ? (
                   <img src={item.photoUrl} alt={`Model ${item.modelNumber}`} />
@@ -128,10 +134,10 @@ export function Sell() {
                 <strong>{item.price.toLocaleString()} EGP</strong>
               </div>
               <div className='variant-buttons'>
-                {item.variants
-                  .filter((v) => v.stockQuantity > 0)
-                  .map((v) => (
-                    <button key={v.id} onClick={() => add(item, v)}>
+                {item.variants.map((v) => {
+                  const left=remaining(v),out=left===0;
+                  return (
+                    <button key={v.id} onClick={() => add(item, v)} disabled={out} className={out?'out-of-stock':''}>
                       <span>
                         <i
                           className='color-swatch'
@@ -140,14 +146,14 @@ export function Sell() {
                         />
                         {v.size} / {v.color}
                       </span>
-                      <small>{v.stockQuantity} left</small>
-                      <Plus size={16} />
+                      <small>{out?'Out of stock':`${left} left`}</small>
+                      {!out&&<Plus size={16} />}
                     </button>
-                  ))}
+                  )})}
               </div>
-            </article>
+            </motion.article>
           ))}
-        </div>
+        </motion.div>
       </section>
       <aside className='basket'>
         <header>
@@ -164,9 +170,9 @@ export function Sell() {
             <p>Select a size and colour to begin the sale.</p>
           </div>
         ) : (
-          <div className='basket-lines'>
-            {cart.map((x, n) => (
-              <article key={x.variant.id}>
+          <motion.div className='basket-lines' layout>
+            <AnimatePresence initial={false}>{cart.map((x, n) => (
+              <motion.article key={x.variant.id} layout initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:20}}>
                 <div>
                   <b>{x.item.modelNumber}</b>
                   <span>
@@ -257,9 +263,9 @@ export function Sell() {
                 >
                   <X />
                 </button>
-              </article>
-            ))}
-          </div>
+              </motion.article>
+            ))}</AnimatePresence>
+          </motion.div>
         )}
         <div className='checkout-details client-details'>
           <label>

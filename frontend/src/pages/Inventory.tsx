@@ -145,13 +145,13 @@ export function Inventory() {
               </strong>
               <div className='chips'>
                 {item.variants.map((v) => (
-                  <span key={v.id}>
+                  <span key={v.id} className={v.stockQuantity<=0?'stock-out':v.stockQuantity<=3?'stock-low':''}>
                     <i
                       className='color-swatch'
                       style={{ backgroundColor: colorSwatch(v.color) }}
                       aria-label={`${v.color} colour`}
                     />
-                    {v.size} / {v.color} - {v.stockQuantity}
+                    {v.size} / {v.color} · {v.stockQuantity<=0?'Out of stock':`${v.stockQuantity} left`}
                   </span>
                 ))}
               </div>

@@ -72,3 +72,34 @@ html,body,#root{max-width:100%;overflow-x:hidden}
 }
 .basket-lines .quantity{gap:6px}.basket-lines .quantity .quantity-input{width:58px;height:34px;padding:5px 7px;text-align:center;font-weight:700}.checkout-details{padding:22px;gap:16px;grid-template-columns:minmax(0,1fr) minmax(120px,1fr)}.checkout-details input:not([type=checkbox]){width:100%;min-height:44px}.checkout-details textarea{width:100%}.basket header,.basket footer{padding:22px}@media(max-width:600px){.checkout-details,.basket header,.basket footer{padding:18px}.basket-lines .quantity .quantity-input{width:62px;height:38px}}
 .color-swatch{display:inline-block;flex:0 0 auto;width:11px;height:11px;border-radius:50%;margin-right:6px;border:1px solid #17151133;box-shadow:0 0 0 1px #fff}.chips .color-swatch{width:9px;height:9px;vertical-align:-1px}.model-badge{overflow:hidden}.model-badge img{width:100%;height:100%;object-fit:cover}.model-badge span{font:600 23px 'Cormorant Garamond';color:var(--gold)}.variant-buttons button>span,.basket-lines article>div:first-child>span{display:flex;align-items:center}
+
+/* Refined interaction and responsive visual system */
+:root{--danger:#b42318;--soft-shadow:0 16px 45px #2a211810;--lift-shadow:0 22px 55px #2a21181c}
+body{background:radial-gradient(circle at 92% 0,#d4b96812,transparent 28rem),var(--ivory)}
+button,a,input,textarea,.item-card,.sell-list article,.actions a{transition:border-color .2s ease,background-color .2s ease,color .2s ease,box-shadow .25s ease,transform .25s ease,opacity .2s ease}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.primary{box-shadow:0 7px 18px #17151118}.primary:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 26px #17151127}
+.sidebar{box-shadow:12px 0 35px #17151112;z-index:2}.sidebar a:hover,.logout:hover{color:var(--white);background:#ffffff0a;transform:translateX(3px)}
+.sidebar a.active{background:linear-gradient(90deg,#d4b96818,transparent);box-shadow:inset 3px 0 var(--gold);border-left:0}
+.topbar{position:relative;z-index:3;box-shadow:0 5px 24px #17151108}.sync-pill:hover{border-color:var(--gold);background:#b8963e09;transform:translateY(-1px)}
+.hero{box-shadow:var(--soft-shadow);isolation:isolate}.hero::after{content:'';position:absolute;inset:0;pointer-events:none;border:1px solid #ffffff0d}
+.hero-copy{animation:reveal-up .65s cubic-bezier(.2,.8,.2,1) both}.hero-figure{animation:reveal-up .65s .12s cubic-bezier(.2,.8,.2,1) both;box-shadow:0 20px 55px #0003}
+.stats,.actions a,.item-card,.sell-list article,.basket,.chart-card,.ledger{box-shadow:var(--soft-shadow)}
+.stats article,.actions a{transition:transform .25s ease,box-shadow .25s ease,background .25s ease}.stats article:hover{background:#fff}.actions a:hover{transform:translateY(-5px);box-shadow:var(--lift-shadow)}
+.item-card{overflow:hidden}.item-card:hover{border-color:#b8963e80;transform:translateY(-4px);box-shadow:var(--lift-shadow)}.item-card:hover .item-art img{transform:scale(1.035)}.item-art img{transition:transform .5s ease}
+.item-art button:hover{background:var(--ink);color:#fff;transform:rotate(-4deg) scale(1.05)}
+.chips .stock-out{color:var(--danger);background:#fff0ee;border:1px solid #b4231826;font-weight:700}.chips .stock-low{color:#925c13;background:#fff7df}
+.search{box-shadow:0 8px 25px #2a211808;transition:border-color .2s ease,box-shadow .2s ease}.search:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px #b8963e12,0 12px 30px #2a211810}
+.sell-list article:hover{border-color:#b8963e80;box-shadow:var(--lift-shadow)}
+.variant-buttons button{position:relative;border-radius:4px;min-height:50px;align-items:center;transition:all .18s ease}.variant-buttons button:hover:not(:disabled){border-color:var(--gold);background:#b8963e0c;transform:translateY(-2px);box-shadow:0 8px 18px #2a211810}.variant-buttons button:active:not(:disabled){transform:scale(.97)}
+.variant-buttons button.out-of-stock{border-color:#b4231838;background:#fff2f0;cursor:not-allowed;opacity:1}.variant-buttons button.out-of-stock small{color:var(--danger);font-weight:800}.variant-buttons button.out-of-stock>span{opacity:.58}
+.basket{overflow:hidden}.basket header{background:linear-gradient(135deg,#fff,#f7f1e6)}.basket header>span{box-shadow:0 5px 15px #b8963e45}
+.basket-lines article{background:#fff;transition:background .2s ease}.basket-lines article:hover{background:#fdf9f1}.quantity button:hover{border-color:var(--gold);background:var(--ivory)}.remove:hover{transform:scale(1.12);color:var(--danger)}
+.sale-button:not(:disabled){background:linear-gradient(135deg,var(--ink),#403222)}.sale-button:not(:disabled):hover{background:linear-gradient(135deg,var(--gold),#987727)}
+.modal{box-shadow:0 30px 90px #0005}.modal-backdrop{backdrop-filter:blur(7px)}
+.mobile-nav a,.mobile-logout{transition:color .2s ease,background .2s ease,transform .2s ease}.mobile-nav a:active,.mobile-logout:active{transform:scale(.92)}
+@keyframes reveal-up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:1200px){.sell-layout{grid-template-columns:minmax(0,1fr) minmax(330px,370px)}.variant-buttons{max-width:430px}}
+@media(max-width:900px){.sell-layout{grid-template-columns:1fr}.basket{position:relative;top:auto}.sell-list article{grid-template-columns:72px minmax(120px,1fr)}.variant-buttons{grid-column:1/-1;max-width:none;justify-content:flex-start}.topbar{backdrop-filter:blur(14px);background:#fffdf8eb}}
+@media(max-width:600px){.page{padding-inline:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}.sell-list{gap:12px}.sell-list article{grid-template-columns:62px minmax(0,1fr);border-radius:8px}.variant-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.variant-buttons button{width:100%;min-width:0}.basket{border-radius:10px}.inventory-grid .item-card{border-radius:8px}.modal{box-shadow:0 -20px 60px #0004}.section-head>div{min-width:0}.section-head p:last-child{font-size:12px}.topbar h1{max-width:55vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@media(max-width:390px){.variant-buttons{grid-template-columns:1fr}.sell-list article{grid-template-columns:54px minmax(0,1fr)}.model-badge{height:56px}.basket-lines article{grid-template-columns:1fr auto}.basket-lines article>label{grid-column:1/-1}.basket-lines .remove{grid-column:2;grid-row:1/3}}
