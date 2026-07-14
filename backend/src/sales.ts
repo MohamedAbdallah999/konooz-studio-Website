@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from './db.js';
 import { validate } from './middleware.js';
@@ -93,7 +93,7 @@ router.post('/', validate(sale), async (req, res) => {
       },
       include: { items: true },
     });
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   res.status(201).json(result);
 });
 
@@ -104,8 +104,25 @@ router.patch('/:id/pay', async (req, res) => {
     if (!existing) throw Object.assign(new Error('Receipt not found'), { status: 404 });
     if (Number(existing.paidAmount) >= Number(existing.totalAmount)) return existing;
     return tx.sale.update({ where: { id }, data: { paidAmount: existing.totalAmount, paidAt: new Date() } });
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   res.json(result);
+});
+
+router.delete('/:id', async (req, res) => {
+  const id = z.string().uuid().parse(req.params.id);
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const existing = await tx.sale.findUnique({ where: { id }, include: { items: true } });
+    if (!existing) throw Object.assign(new Error('Receipt not found'), { status: 404 });
+    if (existing.deletedAt) return;
+    await tx.sale.update({ where: { id }, data: { deletedAt: new Date(), syncStatus: 'synced' } });
+    for (const line of existing.items) {
+      await tx.itemVariant.update({
+        where: { id: line.itemVariantId },
+        data: { stockQuantity: { increment: line.quantity }, syncStatus: 'synced' },
+      });
+    }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  res.status(204).end();
 });
 
 export default router;

@@ -1,65 +1,35 @@
 import 'fake-indexeddb/auto';
-import {beforeEach,describe,expect,it} from 'vitest';
-import {createSale,db,deleteItem,markSalePaid,now,refundSale,saveItem,uid} from './db';
-import type {Item,Variant} from './types';
+import {beforeAll,beforeEach,describe,expect,it,vi} from 'vitest';
+import type {Item,Sale} from './types';
 
-const variant=(itemId:string,size='M',color='Red',stockQuantity=5):Variant=>({id:uid(),itemId,size,color,stockQuantity,createdAt:now(),updatedAt:now(),syncStatus:'pending'});
-const item=(modelNumber:string,size='M',color='Red',stockQuantity=5):Item=>{const id=uid(),time=now();return{id,modelNumber,price:100,material:'Silk',photoUrl:null,variants:[variant(id,size,color,stockQuantity)],createdAt:time,updatedAt:time,syncStatus:'pending'}};
+const storage=new Map<string,string>([['accessToken','test-token']]);
+vi.stubGlobal('sessionStorage',{getItem:(key:string)=>storage.get(key)??null,setItem:(key:string,value:string)=>storage.set(key,value),removeItem:(key:string)=>storage.delete(key)});
+vi.stubGlobal('navigator',{onLine:true});
+let module:typeof import('./db');
+const time='2026-07-14T12:00:00.000Z',json=(value:unknown,status=200)=>new Response(value==null?null:JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
 
-beforeEach(async()=>{db.close();await db.delete();await db.open()});
+beforeAll(async()=>{module=await import('./db')});
+beforeEach(async()=>{module.db.close();await module.db.delete();await module.db.open();vi.restoreAllMocks()});
 
-describe('inventory CRUD',()=>{
-  it('merges the same model into unique size and colour stock combinations',async()=>{
-    await saveItem(item('K-100','M','Red',2));
-    await saveItem(item('k-100','L','Blue',3));
-    const items=await db.items.toArray(),variants=await db.variants.filter(entry=>!entry.deletedAt).toArray();
-    expect(items).toHaveLength(1);
-    expect(variants.map(entry=>[entry.size,entry.color,entry.stockQuantity])).toEqual(expect.arrayContaining([['M','Red',2],['L','Blue',3]]));
-  });
+function server(initialItems:Item[]=[],initialSales:Sale[]=[]){
+  let items=structuredClone(initialItems),sales=structuredClone(initialSales);
+  const fetchMock=vi.fn(async(input:string|URL|Request,init?:RequestInit)=>{
+    const url=String(input),method=init?.method??'GET';
+    if(url.endsWith('/items')&&method==='GET')return json(items);
+    if(url.endsWith('/state')&&method==='GET')return json({items,sales});
+    if(url.endsWith('/sales')&&method==='GET')return json(sales);
+    if(url.endsWith('/items')&&method==='POST'){const body=JSON.parse(String(init?.body)),created={...body,createdAt:time,updatedAt:time,syncStatus:'synced',variants:body.variants.map((v:object)=>({...v,id:crypto.randomUUID(),itemId:body.id,createdAt:time,updatedAt:time,syncStatus:'synced'}))};items.push(created);return json(created,201)}
+    if(url.includes('/items/')&&method==='PUT'){const body=JSON.parse(String(init?.body)),id=url.split('/').pop()!;items=items.map(item=>item.id===id?{...item,...body,id,updatedAt:time,variants:body.variants.map((v:object)=>({...v,id:(v as {id?:string}).id??crypto.randomUUID(),itemId:id,createdAt:time,updatedAt:time,syncStatus:'synced'}))}:item);return json(items.find(item=>item.id===id))}
+    if(url.includes('/items/')&&method==='DELETE'){const id=url.split('/').pop();items=items.filter(item=>item.id!==id);return json(null,204)}
+    if(url.endsWith('/sales')&&method==='POST'){const body=JSON.parse(String(init?.body));for(const line of body.items)for(const item of items)item.variants=item.variants.map(v=>v.id===line.itemVariantId?{...v,stockQuantity:v.stockQuantity-line.quantity}:v);const total=body.items.reduce((sum:number,line:{quantity:number;unitPriceAtSale:number})=>sum+line.quantity*line.unitPriceAtSale,0),created={...body,totalAmount:total,depositAmount:body.depositAmount??total,paidAmount:body.depositAmount??total,discountPercentage:body.discountPercentage,paidAt:null,updatedAt:time,syncStatus:'synced',items:body.items.map((line:object)=>({...line,saleId:body.id,createdAt:time,updatedAt:time,syncStatus:'synced'}))};sales.push(created);return json(created,201)}
+    if(url.endsWith('/pay')&&method==='PATCH'){const id=url.split('/').at(-2);sales=sales.map(sale=>sale.id===id?{...sale,paidAmount:sale.totalAmount,paidAt:time}:sale);return json(sales.find(sale=>sale.id===id))}
+    if(url.includes('/sales/')&&method==='DELETE'){const id=url.split('/').pop(),sale=sales.find(value=>value.id===id)!;for(const line of sale.items)for(const item of items)item.variants=item.variants.map(v=>v.id===line.itemVariantId?{...v,stockQuantity:v.stockQuantity+line.quantity}:v);sales=sales.filter(value=>value.id!==id);return json(null,204)}
+    throw new Error(`Unexpected request ${method} ${url}`);
+  });vi.stubGlobal('fetch',fetchMock);return fetchMock;
+}
 
-  it('rejects a duplicate size and colour pair',async()=>{
-    const model=item('K-200');model.variants.push(variant(model.id,'m','red',4));
-    await expect(saveItem(model)).rejects.toThrow('Each size and colour combination must be unique');
-  });
+describe('online CRUD and canonical data flow',()=>{
+  it('creates, updates, and deletes inventory only through the server',async()=>{server();const id=module.uid(),variantId=module.uid(),input={id,modelNumber:'K-100',price:100,material:'Silk',photoUrl:null,variants:[{id:variantId,itemId:id,size:'M',color:'Red',stockQuantity:5,createdAt:time,updatedAt:time,syncStatus:'pending' as const}]};await module.saveItem(input);expect((await module.db.items.get(id))?.modelNumber).toBe('K-100');const saved=(await module.db.items.get(id))!;saved.price=150;await module.saveItem(saved);expect((await module.db.items.get(id))?.price).toBe(150);await module.deleteItem(saved);expect(await module.db.items.count()).toBe(0)});
 
-  it('coalesces repeated edits into the latest insert payload',async()=>{
-    const saved=await saveItem(item('K-300'));
-    saved.variants[0]!.stockQuantity=9;
-    await saveItem(saved);
-    const queued=await db.syncQueue.where('recordId').equals(saved.variants[0]!.id).toArray();
-    expect(queued).toHaveLength(1);
-    expect(queued[0]!.operation).toBe('insert');
-    expect(queued[0]!.payload.stockQuantity).toBe(9);
-  });
-
-  it('fully removes a never-synced model and its queued variants',async()=>{
-    const saved=await saveItem(item('K-400'));
-    await deleteItem(saved);
-    expect(await db.items.count()).toBe(0);
-    expect(await db.variants.count()).toBe(0);
-    expect(await db.syncQueue.count()).toBe(0);
-  });
-});
-
-describe('sales CRUD',()=>{
-  it('decrements the exact combination and cancels a never-synced refunded sale',async()=>{
-    const saved=await saveItem(item('K-500','XL','Green',5)),selected=saved.variants[0]!;
-    const sale=await createSale([{item:saved,variant:selected,quantity:2,price:100}]);
-    expect((await db.variants.get(selected.id))!.stockQuantity).toBe(3);
-    await refundSale(sale);
-    expect((await db.variants.get(selected.id))!.stockQuantity).toBe(5);
-    expect(await db.sales.count()).toBe(0);
-    expect(await db.saleItems.count()).toBe(0);
-    expect(await db.syncQueue.filter(entry=>entry.tableName==='sales').count()).toBe(0);
-  });
-
-  it('coalesces payment of an offline sale into its insert',async()=>{
-    const saved=await saveItem(item('K-600')),selected=saved.variants[0]!;
-    const sale=await createSale([{item:saved,variant:selected,quantity:1,price:100}],{depositAmount:20});
-    await markSalePaid(sale);
-    const queued=await db.syncQueue.filter(entry=>entry.tableName==='sales'&&entry.recordId===sale.id).toArray();
-    expect(queued).toHaveLength(1);
-    expect(queued[0]!.operation).toBe('insert');
-    expect(queued[0]!.payload.paidAmount).toBe(100);
-  });
+  it('uses server-confirmed sale, payment, refund, and stock values',async()=>{const id=module.uid(),variantId=module.uid(),item:Item={id,modelNumber:'K-200',price:100,material:null,photoUrl:null,createdAt:time,updatedAt:time,syncStatus:'synced',variants:[{id:variantId,itemId:id,size:'L',color:'Blue',stockQuantity:5,createdAt:time,updatedAt:time,syncStatus:'synced'}]};server([item]);await module.refreshServerState();const sale=await module.createSale([{item,variant:item.variants[0]!,quantity:2,price:100}],{depositAmount:20});expect((await module.db.variants.get(variantId))?.stockQuantity).toBe(3);const paid=await module.markSalePaid(sale);expect(paid.paidAmount).toBe(200);await module.refundSale(paid);expect((await module.db.variants.get(variantId))?.stockQuantity).toBe(5);expect(await module.db.sales.count()).toBe(0)});
 });

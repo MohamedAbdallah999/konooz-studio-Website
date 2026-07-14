@@ -1,9 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import "./styles.css";
-registerSW({ immediate: true });
+if('serviceWorker' in navigator)void navigator.serviceWorker.getRegistrations().then(registrations=>Promise.all(registrations.map(registration=>registration.unregister())));
+if('caches' in globalThis)void caches.keys().then(keys=>Promise.all(keys.map(key=>caches.delete(key))));
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

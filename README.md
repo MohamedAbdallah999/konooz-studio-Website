@@ -1,10 +1,10 @@
 # Konooz - The Style You Love
 
-Production-oriented offline-first inventory and point-of-sale system for a single-admin dress shop. This is a new build at `konooz-studio`; the pre-existing `konooz` repository was not modified.
+Production-oriented server-authoritative inventory and point-of-sale system for a dress shop operating across multiple devices.
 
 ## Included
 
-React 19, Vite, TypeScript, Tailwind, Framer Motion, react-three-fiber/drei; Express 5, Prisma/PostgreSQL, Zod, Helmet, JWT and bcrypt cost 12; Dexie IndexedDB with an ordered offline queue, reconnect replay, LWW conflict audit; PWA, responsive layouts, inventory, checkout, transactional stock decrement, receipt printing/PDF, reporting, Docker, tests, and CI.
+React 19, Vite, TypeScript, Tailwind, Framer Motion, react-three-fiber/drei; Express 5, Prisma/PostgreSQL, Zod, Helmet, JWT and bcrypt cost 12; direct authenticated CRUD, repeatable-read state snapshots, stale-write protection, responsive layouts, transactional stock decrement, receipt printing/PDF, reporting, Docker, tests, and CI.
 
 All dependencies are free/open-source. Fonts are locally bundled SIL-OFL packages. Browser printing replaces paid receipt services, and Pino provides local structured logs instead of paid monitoring.
 
@@ -21,8 +21,8 @@ Never commit `.env`. The frontend receives only `VITE_API_URL`. Production uses 
 ## No-card deployment
 
 Use Neon Free for PostgreSQL, Cloudflare Workers Free for the Express API, and Cloudflare Pages Free for the frontend. The Worker uses Cloudflare's Node.js compatibility layer and Prisma's PostgreSQL driver adapter. Production secrets are uploaded with Wrangler and never committed. Follow `DEPLOYMENT.md` for the exact dashboard and PowerShell steps.
-## Printer and offline behavior
+## Printer and live-data behavior
 
 Install the receipt printer with its OS driver. From a receipt choose Print, select the system printer, disable browser headers/footers, and use an 80 mm roll. "Save PDF" uses the browser's PDF destination. Browsers intentionally cannot silently select printers without kiosk software.
 
-The installed PWA reads/writes IndexedDB. Mutations enter `sync_queue` in timestamp order; reconnect pushes then pulls since `lastSync`. Newest `updated_at` wins, unequal versions are recorded in `conflict_logs`, and deletes use tombstones. Keep device time automatic. Multiple simultaneous admins would require version-based/domain merge instead of LWW.
+Every create, update, delete, sale, payment, and refund must succeed in PostgreSQL before the browser updates. Inventory and sales refresh together from one repeatable-read database snapshot. Stale edits from another device are rejected and reloaded instead of overwriting newer stock.

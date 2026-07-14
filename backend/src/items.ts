@@ -8,11 +8,13 @@ const router = Router();
 const variant = z.object({
   id: z.string().uuid().optional(),
   size: z.string().trim().min(1).max(80),
+  expectedUpdatedAt: z.string().datetime().optional(),
   color: z.string().trim().min(1).max(50),
   stockQuantity: z.number().int().min(0).max(100000),
 });
 const item = z.object({
   id: z.string().uuid().optional(),
+  expectedUpdatedAt: z.string().datetime().optional(),
   modelNumber: z.string().trim().min(1).max(80),
   price: z.number().nonnegative().max(10000000),
   photoUrl: z.string().max(1_500_000).refine(
@@ -58,29 +60,47 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', validate(item), async (req, res) => {
-  const { variants, ...data } = req.body;
-  const created = await prisma.item.create({
-    data: { ...data, id: data.id, variants: { create: variants } },
-    include: { variants: { where: { deletedAt: null } } },
+  const { variants, expectedUpdatedAt: _, ...data } = req.body;
+  const created = await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${data.modelNumber.toLocaleLowerCase()}))`;
+    const duplicate = await tx.item.findFirst({ where: { modelNumber: { equals: data.modelNumber, mode: 'insensitive' }, deletedAt: null } });
+    if (duplicate) throw Object.assign(new Error('A model with this number already exists.'), { status: 409 });
+    return tx.item.create({
+      data: { ...data, id: data.id, variants: { create: variants.map(({ expectedUpdatedAt: _version, ...entry }: { expectedUpdatedAt?: string }) => entry) } },
+      include: { variants: { where: { deletedAt: null } } },
+    });
   });
   res.status(201).json(created);
 });
 
 router.put('/:id', validate(item), async (req, res) => {
   const id = String(req.params.id);
-  const { variants, ...data } = req.body;
+  const { variants, expectedUpdatedAt, ...data } = req.body;
   const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const existing = await tx.item.findUniqueOrThrow({ where: { id }, include: { variants: true } });
     const retainedIds = variants.flatMap((entry: { id?: string }) => entry.id ? [entry.id] : []);
+    if (!expectedUpdatedAt || existing.updatedAt.toISOString() !== expectedUpdatedAt) {
+      throw Object.assign(new Error('This model changed on another device. The latest data has been loaded; review it and try again.'), { status: 409 });
+    }
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${data.modelNumber.toLocaleLowerCase()}))`;
+    const duplicate = await tx.item.findFirst({ where: { id: { not: id }, modelNumber: { equals: data.modelNumber, mode: 'insensitive' }, deletedAt: null } });
+    if (duplicate) throw Object.assign(new Error('A model with this number already exists.'), { status: 409 });
+
+    for (const entry of variants.filter((value: { id?: string }) => value.id)) {
+      const current = existing.variants.find(candidate => candidate.id === entry.id);
+      if (!current || !entry.expectedUpdatedAt || current.updatedAt.toISOString() !== entry.expectedUpdatedAt)
+        throw Object.assign(new Error('Stock changed on another device. The latest data has been loaded; review it and try again.'), { status: 409 });
+    }
     await tx.itemVariant.updateMany({
       where: { itemId: id, id: { notIn: retainedIds }, deletedAt: null },
       data: { deletedAt: new Date(), syncStatus: 'synced' },
     });
     for (const entry of variants) {
+      const { expectedUpdatedAt: _version, ...variantData } = entry;
       if (entry.id) {
         await tx.itemVariant.update({
           where: { id: entry.id, itemId: id },
-          data: { size: entry.size, color: entry.color, stockQuantity: entry.stockQuantity, deletedAt: null, syncStatus: 'synced' },
+          data: { ...variantData, deletedAt: null, syncStatus: 'synced' },
         });
       } else {
         const reusable = existing.variants.find(candidate =>
@@ -89,10 +109,10 @@ router.put('/:id', validate(item), async (req, res) => {
         if (reusable) {
           await tx.itemVariant.update({
             where: { id: reusable.id },
-            data: { size: entry.size, color: entry.color, stockQuantity: entry.stockQuantity, deletedAt: null, syncStatus: 'synced' },
+            data: { ...variantData, deletedAt: null, syncStatus: 'synced' },
           });
         } else {
-          await tx.itemVariant.create({ data: { ...entry, itemId: id } });
+          await tx.itemVariant.create({ data: { ...variantData, itemId: id } });
         }
       }
     }

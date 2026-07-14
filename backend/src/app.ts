@@ -7,7 +7,7 @@ import { auth, errorHandler, notFound } from './middleware.js';
 import authRoutes from './auth.js';
 import itemRoutes from './items.js';
 import saleRoutes from './sales.js';
-import syncRoutes from './sync.js';
+import stateRoutes from './state.js';
 import { prisma, prismaContext } from './db.js';
 export const app = express();
 const allowedOrigin = (origin: string | undefined) => {
@@ -58,6 +58,6 @@ app.get('/health', async (_q, r, next) => {
 app.use('/api/auth', express.json({ limit: '32kb' }), authRoutes);
 app.use('/api/items', auth, express.json({ limit: '10mb' }), itemRoutes);
 app.use('/api/sales', auth, express.json({ limit: '2mb' }), saleRoutes);
-app.use('/api/sync', auth, express.json({ limit: '10mb' }), syncRoutes);
+app.use('/api/state', auth, stateRoutes);
 app.use(notFound);
 app.use(errorHandler);
