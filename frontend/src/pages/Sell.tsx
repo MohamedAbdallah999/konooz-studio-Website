@@ -119,8 +119,15 @@ export function Sell() {
           />
         </div>
         <motion.div className='sell-list' layout>
-          {results.map((item) => (
-            <motion.article key={item.id} layout initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} whileHover={{y:-3}}>
+          {results.map((item,index) => (
+            <motion.article
+              key={item.id}
+              layout
+              initial={{opacity:0,x:-28}}
+              animate={{opacity:1,x:0}}
+              transition={{duration:.48,delay:Math.min(index*.045,.28),ease:[.22,1,.36,1]}}
+              whileHover={{y:-1}}
+            >
               <div className='model-badge'>
                 {item.photoUrl ? (
                   <img src={item.photoUrl} alt={`Model ${item.modelNumber}`} />
@@ -172,7 +179,7 @@ export function Sell() {
         ) : (
           <motion.div className='basket-lines' layout>
             <AnimatePresence initial={false}>{cart.map((x, n) => (
-              <motion.article key={x.variant.id} layout initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:20}}>
+              <motion.article key={x.variant.id} layout initial={{opacity:0,x:-16}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-10}} transition={{duration:.35,ease:[.22,1,.36,1]}}>
                 <div>
                   <b>{x.item.modelNumber}</b>
                   <span>
