@@ -10,6 +10,17 @@ import saleRoutes from './sales.js';
 import syncRoutes from './sync.js';
 import { prisma, prismaContext } from './db.js';
 export const app = express();
+const allowedOrigin = (origin: string | undefined) => {
+  if (!origin || origin === config.FRONTEND_ORIGIN) return true;
+  try {
+    const hostname = new URL(origin).hostname;
+    return origin.startsWith('https://') && (
+      hostname === 'konooz-studio.vercel.app' ||
+      (hostname.startsWith('frontend-') && hostname.endsWith('-mohameds-projects-c959c00f.vercel.app'))
+    );
+  } catch { return false; }
+};
+
 app.set('trust proxy', 1);
 app.use(prismaContext);
 app.use((req, res, next) => {
@@ -33,7 +44,7 @@ app.use(
     },
   }),
 );
-app.use(cors({ origin: config.FRONTEND_ORIGIN, credentials: true }));
+app.use(cors({ origin: (origin, callback) => callback(null, allowedOrigin(origin)), credentials: true }));
 app.use(cookieParser());
 app.get('/health', async (_q, r, next) => {
   try {
