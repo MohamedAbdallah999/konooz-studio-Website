@@ -7,6 +7,7 @@ import type { Item, Variant } from '../types';
 import { optimizeModelPhoto } from '../image';
 import { colorSwatch } from '../colorSwatch';
 import './Inventory.css';
+import { AnimatedTitle } from '../components/AnimatedTitle';
 
 const newVariant = (itemId: string): Variant => ({
   id: uid(),
@@ -102,7 +103,7 @@ export function Inventory() {
       <section className='section-head'>
         <div>
           <p className='eyebrow'>COLLECTION</p>
-          <h2>Inventory</h2>
+          <AnimatedTitle>Inventory</AnimatedTitle>
           <p>Each model, size, colour and piece, at a glance.</p>
         </div>
         <button className='primary' onClick={() => setEditing(blank())}>

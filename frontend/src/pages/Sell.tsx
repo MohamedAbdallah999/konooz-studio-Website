@@ -6,6 +6,7 @@ import type { Item, Variant, Sale } from '../types';
 import { Receipt } from './Receipt';
 import { colorSwatch } from '../colorSwatch';
 import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatedTitle } from '../components/AnimatedTitle';
 
 type Cart = { item: Item; variant: Variant; quantity: number; price: number };
 export function Sell() {
@@ -107,7 +108,7 @@ export function Sell() {
         <div className='section-head compact'>
           <div>
             <p className='eyebrow'>NEW TRANSACTION</p>
-            <h2>Select a dress</h2>
+            <AnimatedTitle>Select a dress</AnimatedTitle>
           </div>
         </div>
         <div className='search'>
