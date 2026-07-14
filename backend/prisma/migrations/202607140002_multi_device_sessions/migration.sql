@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS "refresh_sessions" ("id" UUID NOT NULL, "admin_id" UUID NOT NULL, "token_hash" TEXT NOT NULL, "expires_at" TIMESTAMP(3) NOT NULL, "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "refresh_sessions_pkey" PRIMARY KEY ("id"), CONSTRAINT "refresh_sessions_admin_id_fkey" FOREIGN KEY ("admin_id") REFERENCES "admin_user"("id") ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE INDEX IF NOT EXISTS "refresh_sessions_admin_id_idx" ON "refresh_sessions"("admin_id");
+CREATE INDEX IF NOT EXISTS "refresh_sessions_expires_at_idx" ON "refresh_sessions"("expires_at");

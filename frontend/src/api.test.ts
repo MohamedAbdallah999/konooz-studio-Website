@@ -80,9 +80,11 @@ describe('network synchronization',()=>{
   });
 
   it('drops permanently rejected stale mutations and reconciles server truth',async()=>{
-    const queued=mutation();await db.syncQueue.add(queued);
+    const queued=mutation(),time=new Date().toISOString();await db.syncQueue.add(queued);
+    await db.items.add({id:crypto.randomUUID(),modelNumber:'STALE',price:10,variants:[],createdAt:time,updatedAt:time,syncStatus:'synced'});
     vi.stubGlobal('fetch',vi.fn(async(input:string|URL|Request)=>String(input).includes('/sync/push')?json({results:[{id:queued.id,status:'error',message:'record no longer exists',retryable:false}]}):json(emptyPull())));
     await expect(syncNow()).resolves.toBeUndefined();
     expect(await db.syncQueue.get(queued.id)).toBeUndefined();
+    expect(await db.items.count()).toBe(0);
   });
 });

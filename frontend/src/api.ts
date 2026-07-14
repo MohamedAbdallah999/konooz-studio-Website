@@ -5,14 +5,16 @@ const base=import.meta.env.VITE_API_URL??'http://localhost:4000/api';
 let token=sessionStorage.getItem('accessToken');
 let activeSync:Promise<void>|null=null;
 let syncRequested=false;
+let activeRefresh:Promise<string|null>|null=null;
+const refreshAccessToken=()=>activeRefresh??=(async()=>{const response=await fetch(base+'/auth/refresh',{method:'POST',credentials:'include',cache:'no-store'});if(!response.ok)return null;const next=(await response.json()).accessToken as string;token=next;sessionStorage.setItem('accessToken',next);return next})().finally(()=>{activeRefresh=null});
 
 async function request(path:string,init:RequestInit={}){
   const headers=new Headers(init.headers);headers.set('Content-Type','application/json');
   if(token)headers.set('Authorization',`Bearer ${token}`);
   let response=await fetch(base+path,{...init,headers,credentials:'include',cache:'no-store'});
   if(response.status===401&&path!=='/auth/refresh'){
-    const refreshed=await fetch(base+'/auth/refresh',{method:'POST',credentials:'include'});
-    if(refreshed.ok){token=(await refreshed.json()).accessToken;sessionStorage.setItem('accessToken',token!);headers.set('Authorization',`Bearer ${token}`);response=await fetch(base+path,{...init,headers,credentials:'include',cache:'no-store'})}
+    const refreshed=await refreshAccessToken();
+    if(refreshed){headers.set('Authorization',`Bearer ${refreshed}`);response=await fetch(base+path,{...init,headers,credentials:'include',cache:'no-store'})}
   }
   if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error??'Request failed');
   return response.status===204?null:response.json();
@@ -49,7 +51,9 @@ async function performSync(){
   }
   const remaining=await db.syncQueue.toArray();
   const pending=new Set(remaining.map((entry:QueueMutation)=>pendingKey(entry.tableName,entry.recordId)));
-  const since=forceFullPull?new Date(0).toISOString():(await db.meta.get('lastSync'))?.value??new Date(0).toISOString();
+  const lastFullSync=Date.parse((await db.meta.get('lastFullSync'))?.value??'');
+  const fullPull=forceFullPull||!Number.isFinite(lastFullSync)||Date.now()-lastFullSync>=60_000;
+  const since=fullPull?new Date(0).toISOString():(await db.meta.get('lastSync'))?.value??new Date(0).toISOString();
   const pulled=await request(`/sync/pull?since=${encodeURIComponent(since)}`);
   await db.transaction('rw',[db.items,db.variants,db.sales,db.saleItems,db.meta],async()=>{
     const items=(pulled.items as Item[]).filter(raw=>!pending.has(pendingKey('items',raw.id))).map(raw=>({...raw,price:Number(raw.price),variants:(raw.variants??[]).map(variantOf),syncStatus:'synced' as const}));
@@ -61,6 +65,17 @@ async function performSync(){
     if(variants.length)await db.variants.bulkPut(variants);
     if(sales.length)await db.sales.bulkPut(sales);
     if(saleLines.length)await db.saleItems.bulkPut(saleLines);
+    if(fullPull){
+      const itemIds=new Set((pulled.items as Item[]).map(value=>value.id)),variantIds=new Set((pulled.itemVariants as Variant[]).map(value=>value.id));
+      const saleIds=new Set((pulled.sales as Sale[]).map(value=>value.id)),saleLineIds=new Set((pulled.saleItems as SaleLine[]).map(value=>value.id));
+      const staleItems=(await db.items.toArray()).filter(value=>!itemIds.has(value.id)&&!pending.has(pendingKey('items',value.id))).map(value=>value.id);
+      const staleVariants=(await db.variants.toArray()).filter(value=>!variantIds.has(value.id)&&!pending.has(pendingKey('item_variants',value.id))).map(value=>value.id);
+      const staleSales=(await db.sales.toArray()).filter(value=>!saleIds.has(value.id)&&!pending.has(pendingKey('sales',value.id))).map(value=>value.id);
+      const staleSaleLines=(await db.saleItems.toArray()).filter(value=>!saleLineIds.has(value.id)&&!pending.has(pendingKey('sale_items',value.id))&&!pending.has(pendingKey('sales',value.saleId))).map(value=>value.id);
+      if(staleItems.length)await db.items.bulkDelete(staleItems);if(staleVariants.length)await db.variants.bulkDelete(staleVariants);
+      if(staleSales.length)await db.sales.bulkDelete(staleSales);if(staleSaleLines.length)await db.saleItems.bulkDelete(staleSaleLines);
+      await db.meta.put({key:'lastFullSync',value:new Date().toISOString()});
+    }
     const variantsByItem=new Map<string,Variant[]>();
     for(const variant of await db.variants.filter(entry=>!entry.deletedAt).toArray()){const group=variantsByItem.get(variant.itemId)??[];group.push(variant);variantsByItem.set(variant.itemId,group)}
     const allItems=(await db.items.toArray()).map(item=>({...item,variants:variantsByItem.get(item.id)??[]}));
