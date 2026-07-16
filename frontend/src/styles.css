@@ -112,3 +112,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .item-art button svg{display:block;flex:none;margin:0}
 .item-art button:hover{background:var(--gold);border-color:var(--champagne);color:#fff;transform:translateY(-2px) rotate(-4deg) scale(1.05);box-shadow:0 11px 25px #17151138}
 .item-art button:active{transform:scale(.94)}
+
+.receipt-search{margin-top:18px}

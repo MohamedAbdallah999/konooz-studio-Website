@@ -7,6 +7,7 @@ import { Receipt } from './Receipt';
 import { colorSwatch } from '../colorSwatch';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AnimatedTitle } from '../components/AnimatedTitle';
+import { NumberInput } from '../components/NumberInput';
 
 type Cart = { item: Item; variant: Variant; quantity: number; price: number };
 export function Sell() {
@@ -199,9 +200,8 @@ export function Sell() {
                   >
                     <Minus />
                   </button>
-                  <input
+                  <NumberInput
                     className='quantity-input'
-                    type='number'
                     min='1'
                     max={x.variant.stockQuantity}
                     step='1'
@@ -244,8 +244,7 @@ export function Sell() {
                   </button>
                 </div>
                 <label>
-                  <input
-                    type='number'
+                  <NumberInput
                     min='0'
                     value={x.price}
                     onChange={(e) =>
@@ -309,8 +308,7 @@ export function Sell() {
           <label>
             Discount percentage
             <div className='discount-input'>
-              <input
-                type='number'
+              <NumberInput
                 min='0'
                 max='100'
                 step='0.5'
@@ -338,8 +336,7 @@ export function Sell() {
           {partialPayment && (
             <label className='wide'>
               Deposit paid now
-              <input
-                type='number'
+              <NumberInput
                 min='0'
                 max={total}
                 step='0.01'

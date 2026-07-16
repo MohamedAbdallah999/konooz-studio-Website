@@ -8,6 +8,7 @@ import { optimizeModelPhoto } from '../image';
 import { colorSwatch } from '../colorSwatch';
 import './Inventory.css';
 import { AnimatedTitle } from '../components/AnimatedTitle';
+import { NumberInput } from '../components/NumberInput';
 
 const newVariant = (itemId: string): Variant => ({
   id: uid(),
@@ -225,8 +226,7 @@ export function Inventory() {
                 </label>
                 <label>
                   Price (EGP)
-                  <input
-                    type='number'
+                  <NumberInput
                     min='0'
                     step='0.01'
                     value={editing.price}
@@ -323,9 +323,8 @@ export function Inventory() {
                       }
                       required
                     />
-                    <input
+                    <NumberInput
                       className='stock-quantity'
-                      type='number'
                       min='0'
                       step='1'
                       placeholder='Stock'
