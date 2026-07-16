@@ -125,3 +125,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .basket footer .basket-pieces b{color:var(--ink);font-size:12px}
 .receipt-payment .receipt-pieces{font-size:10px;color:var(--muted)}
 .receipt-payment .receipt-pieces b{color:var(--ink)}
+
+/* Larger New Sale product previews with details below each photo. */
+.sell-list article{grid-template-columns:minmax(190px,220px) minmax(0,1fr);align-items:start}
+.sell-product{min-width:0}
+.sell-product .model-badge{min-height:180px}
+.sell-product-copy{display:grid;gap:5px;padding-top:12px}
+.sell-product-copy strong{font:600 21px/1.15 'Cormorant Garamond',serif;overflow-wrap:anywhere}
+.sell-product-copy span{font-size:12px;font-weight:700;color:var(--gold)}
+.sell-list .variant-buttons{align-self:center}
+@media(max-width:600px){
+  .sell-list article{grid-template-columns:1fr}
+  .sell-product{width:min(240px,100%)}
+  .sell-product .model-badge{min-height:180px}
+  .sell-list .variant-buttons{grid-column:1;width:100%;max-width:none}
+}

@@ -124,17 +124,18 @@ export function Sell() {
         <div className='sell-list'>
           {results.map((item) => (
             <article key={item.id}>
-              <div className='model-badge'>
-                {item.photoUrl ? (
-                  <img src={item.photoUrl} alt={`Model ${item.modelNumber}`} />
-                ) : (
-                  <span>{item.modelNumber.slice(0, 2).toUpperCase()}</span>
-                )}
-              </div>
-              <div>
-                <small>MODEL</small>
-                <h3>{item.modelNumber}</h3>
-                <strong>{item.price.toLocaleString()} EGP</strong>
+              <div className='sell-product'>
+                <div className='model-badge'>
+                  {item.photoUrl ? (
+                    <img src={item.photoUrl} alt={`Model ${item.modelNumber}`} />
+                  ) : (
+                    <span>{item.modelNumber.slice(0, 2).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className='sell-product-copy'>
+                  <strong>Model: {item.modelNumber}</strong>
+                  <span>EGP {item.price.toLocaleString()}</span>
+                </div>
               </div>
               <div className='variant-buttons'>
                 {item.variants.map((v) => {
