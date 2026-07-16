@@ -115,9 +115,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 
 .receipt-search{margin-top:18px}
 
-/* Show complete model photos and sale piece totals. */
-.item-art img,.model-badge img{object-fit:contain;object-position:center;background:var(--ivory)}
+/* Preserve each model photo's full natural aspect ratio without cropping. */
+.item-art{height:auto;min-height:130px}
+.model-badge{height:auto;min-height:65px}
+.item-art img,.model-badge img{display:block;width:100%;height:auto;object-fit:initial;background:var(--ivory)}
 .item-card:hover .item-art img{transform:none}
+/* Sale piece totals. */
 .basket footer .basket-pieces{font-size:11px;color:var(--muted);margin-bottom:7px}
 .basket footer .basket-pieces b{color:var(--ink);font-size:12px}
 .receipt-payment .receipt-pieces{font-size:10px;color:var(--muted)}
