@@ -114,3 +114,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .item-art button:active{transform:scale(.94)}
 
 .receipt-search{margin-top:18px}
+
+/* Show complete model photos and sale piece totals. */
+.item-art img,.model-badge img{object-fit:contain;object-position:center;background:var(--ivory)}
+.item-card:hover .item-art img{transform:none}
+.basket footer .basket-pieces{font-size:11px;color:var(--muted);margin-bottom:7px}
+.basket footer .basket-pieces b{color:var(--ink);font-size:12px}
+.receipt-payment .receipt-pieces{font-size:10px;color:var(--muted)}
+.receipt-payment .receipt-pieces b{color:var(--ink)}

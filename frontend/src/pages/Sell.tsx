@@ -50,7 +50,8 @@ export function Sell() {
           )
         : [...c, { item, variant: v, quantity: 1, price: item.price }];
     });
-  const subtotal = cart.reduce((s, x) => s + x.quantity * x.price, 0),
+  const totalPieces = cart.reduce((sum, line) => sum + line.quantity, 0),
+    subtotal = cart.reduce((s, x) => s + x.quantity * x.price, 0),
     discountAmount = (subtotal * discount) / 100,
     total = Math.round((subtotal - discountAmount) * 100) / 100;
   const complete = async () => {
@@ -164,7 +165,7 @@ export function Sell() {
             <p className='eyebrow'>CURRENT SALE</p>
             <h2>Your basket</h2>
           </div>
-          <span>{cart.reduce((s, x) => s + x.quantity, 0)}</span>
+          <span>{totalPieces}</span>
         </header>
         {!cart.length ? (
           <div className='basket-empty'>
@@ -362,6 +363,10 @@ export function Sell() {
               </div>
             </>
           )}
+          <div className='basket-pieces'>
+            <span>Total Pcs</span>
+            <b>{totalPieces}</b>
+          </div>
           <div>
             <span>Total</span>
             <strong>
