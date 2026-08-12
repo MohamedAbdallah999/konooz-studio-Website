@@ -13,17 +13,24 @@ Cloudflare does not require a payment card for the Free plan. Do not use the rem
 
 The GitHub repository, Neon database, database schema, administrator seed, and initial frontend preparation were completed in Steps 1-4.
 
-## Step 5 — apply the new production database migration
+## Step 5 — approve and apply the pack migration
 
-A new migration enables PostgreSQL `pgcrypto`, allowing password verification to run in Neon instead of consuming Cloudflare Worker CPU.
+Follow `PACK_MIGRATION.md` first. Do not continue while any row in
+`backend/prisma/pack-mapping.production.csv` is unapproved or has a blank pack
+quantity. The first new migration creates a database-resident backup schema and
+the second is additive; neither removes the legacy product tables.
 
-From the repository root in PowerShell, paste the same Neon connection string used previously:
+From the repository root in PowerShell, paste the Neon connection string:
 
 ```powershell
 $env:DATABASE_URL="YOUR_NEON_CONNECTION_STRING"
 npm run db:migrate -w backend
+npm run db:migrate-packs -w backend -- prisma/pack-mapping.production.csv
 Remove-Item Env:DATABASE_URL
 ```
+
+Save the mapping command's JSON report and execute
+`backend/prisma/validate-pack-migration.sql` before deploying either application.
 
 Do not run the administrator seed again. Your existing administrator and password remain valid.
 
@@ -212,3 +219,17 @@ $env:DATABASE_URL="YOUR_NEON_CONNECTION_STRING"
 npm run db:migrate -w backend
 Remove-Item Env:DATABASE_URL
 ```
+
+## Production release record — 2026-08-13
+
+- Frontend: `https://konooz-studio.pages.dev`
+- Pages deployment: `d22e9354-0659-49da-93e7-f16b5e33745d`
+- Backend: `https://konooz-api.mohamed234552.workers.dev`
+- Worker active version: `e5547505-f0a0-4eb2-a19e-62bf14b94d2a`
+- Neon production branch: `br-snowy-moon-as0vja82`
+- Pre-migration Neon backup branch: `backup-pack-migration-20260813` (`br-orange-rice-as0f617x`)
+- Immediate previous Pages rollback deployment: `5e35fedb-4618-4993-86c7-38f42b0107b9`
+- Pre-migration Pages rollback deployment: `51650822-8dcc-4ce0-b4fc-c2f452e2fcc4`
+- Pre-migration Worker rollback version: `02f749b6-8579-45e6-bfa3-14b6ba4db0f5`
+
+The production browser smoke test passed login, nested model creation, server rejection of submitted price/total fields, two-pack checkout, receipt and PDF generation, historical snapshot preservation after changing current catalogue data, refund stock restoration, and model deactivation. The smoke records are retained as refunded history; their temporary models are inactive.

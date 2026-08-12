@@ -1,0 +1,2 @@
+modelNumber,legacyColour,newColourName,sizesPerPack,stockQuantity,expectedSizeStocks,approved
+TEST,red,Red,2,3,M:3|L:3,true

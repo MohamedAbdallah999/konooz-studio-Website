@@ -1,0 +1,45 @@
+modelNumber,legacyColour,newColourName,sizesPerPack,stockQuantity,expectedSizeStocks,approved
+1534,kohly,Kohly,4,0,L:0|M:0|XL:0|XXL:0,true
+1534,burgundy,Burgundy,4,0,L:0|M:0|XL:0|XXL:0,true
+1534,brown,Brown,4,0,L:0|M:0|XL:0|XXL:0,true
+1593,white,White,4,0,L:1|M:1|XL:0|XXL:1,true
+1593,gashy,Gashy,4,2,L:2|M:2|XL:2|XXL:2,true
+1593,brown,Brown,4,2,L:2|M:2|XL:2|XXL:2,true
+1593,kashmer,Kashmer,4,1,L:1|M:1|XL:1|XXL:1,true
+1593,semon,Semon,4,3,L:3|M:3|XL:3|XXL:3,true
+1553,red,Red,4,1,L:1|M:1|XL:1|XXL:1,true
+1553,kashmer,Kashmer,4,1,L:1|M:1|XL:1|XXL:1,true
+1553,beige,Beige,4,6,L:6|M:6|XL:6|XXL:7,true
+1553,baby blue,Baby blue,4,9,L:9|M:9|XL:9|XXL:9,true
+1553,burgundy,Burgundy,4,4,L:4|M:4|XL:4|XXL:4,true
+1553,black,Black,4,5,L:5|M:5|XL:5|XXL:5,true
+1553,mint,Mint,4,4,L:4|M:4|XL:4|XXL:4,true
+1553,purple,Purple,4,1,L:1|M:1|XL:1|XXL:1,true
+1530,segar,Segar,4,4,L:4|M:4|XL:4|XXL:4,true
+1530,black,Black,4,7,L:8|M:7|XL:8|XXL:8,true
+1530,andigo,Andigo,4,7,L:7|M:7|XL:7|XXL:7,true
+1530,purple,Purple,4,5,L:5|M:5|XL:5|XXL:5,true
+1530,kohly,Kohly,4,3,L:3|M:3|XL:3|XXL:3,true
+1505,zety,Zety,4,6,L:6|M:6|XL:6|XXL:6,true
+1505,cafe,Cafe,4,2,L:2|M:2|XL:2|XXL:2,true
+1505,white,White,4,3,L:3|M:3|XL:3|XXL:3,true
+1505,baby blue,Baby blue,4,7,L:7|M:7|XL:7|XXL:7,true
+1505,black,Black,4,2,L:2|M:2|XL:2|XXL:2,true
+1544,andigo,Andigo,4,2,L:2|M:2|XL:2|XXL:2,true
+1544,blue,Blue,4,2,L:2|M:2|XL:2|XXL:2,true
+1544,fushia,Fushia,4,3,L:3|M:3|XL:3|XXL:5,true
+1550,kashmer,Kashmer,3,13,L:13|M:13|XL:13,true
+1550,black,Black,4,1,L:1|M:2|XL:2|XXL:2,true
+1550,mint,Mint,4,11,L:11|M:11|XL:11|XXL:11,true
+1550,basly,Basly,4,15,L:15|M:15|XL:15|XXL:15,true
+1550,kashmer mehmer,Kashmer mehmer,4,2,L:2|M:2|XL:2|XXL:2,true
+1550,kasmer,Kasmer,1,13,XXL:13,true
+1551,burgundy,Burgundy,4,2,L:2|M:2|XL:2|XXL:2,true
+1551,black,Black,4,5,L:5|M:5|XL:5|XXL:5,true
+1551,beige,Beige,4,3,L:3|M:3|XL:3|XXL:3,true
+1551,andigo,Andigo,4,3,L:3|M:3|XL:3|XXL:3,true
+1551,kashmer,Kashmer,4,3,L:3|M:3|XL:3|XXL:3,true
+1594,black,Black,4,2,L:2|M:2|XL:2|XXL:2,true
+1594,segar,Segar,4,2,L:2|M:2|XL:2|XXL:2,true
+1594,beige,Beige,4,1,L:1|M:1|XL:1|XXL:1,true
+1594,white,White,4,1,L:1|M:1|XL:1|XXL:1,true

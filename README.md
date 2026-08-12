@@ -1,10 +1,10 @@
 # Konooz - The Style You Love
 
-Production-oriented server-authoritative inventory and point-of-sale system for a dress shop operating across multiple devices.
+Production-oriented server-authoritative model → colour → pack inventory and point-of-sale system for a dress shop operating across multiple devices.
 
 ## Included
 
-React 19, Vite, TypeScript, Tailwind, Framer Motion, react-three-fiber/drei; Express 5, Prisma/PostgreSQL, Zod, Helmet, JWT and bcrypt cost 12; direct authenticated CRUD, repeatable-read state snapshots, stale-write protection, responsive layouts, transactional stock decrement, receipt printing/PDF, reporting, Docker, tests, and CI.
+React 19, Vite, TypeScript, Tailwind, Framer Motion, react-three-fiber/drei; Express 5, Prisma/PostgreSQL, Zod, Helmet, JWT and bcrypt cost 12; authenticated nested model/colour/pack CRUD, repeatable-read state snapshots, stale-write protection, server-authoritative Decimal pricing, transactional pack-stock decrement, immutable sale snapshots, receipt printing/PDF, reporting, Docker, tests, and CI.
 
 All dependencies are free/open-source. Fonts are locally bundled SIL-OFL packages. Browser printing replaces paid receipt services, and Pino provides local structured logs instead of paid monitoring.
 
@@ -25,4 +25,6 @@ Use Neon Free for PostgreSQL, Cloudflare Workers Free for the Express API, and C
 
 Install the receipt printer with its OS driver. From a receipt choose Print, select the system printer, disable browser headers/footers, and use an 80 mm roll. "Save PDF" uses the browser's PDF destination. Browsers intentionally cannot silently select printers without kiosk software.
 
-Every create, update, delete, sale, payment, and refund must succeed in PostgreSQL before the browser updates. Inventory and sales refresh together from one repeatable-read database snapshot. Stale edits from another device are rejected and reloaded instead of overwriting newer stock.
+Every create, update, deactivation, sale, payment, and refund must succeed in PostgreSQL before the browser updates. Inventory and sales refresh together from one repeatable-read database snapshot. Customers buy packs; `sizesPerPack` describes each configuration, and stock is always a count of packs. The browser sends only model/colour/pack IDs and number of packs; PostgreSQL-backed server code calculates and snapshots prices and totals. Stale edits from another device are rejected and reloaded instead of overwriting newer stock.
+
+Production migration is intentionally gated by the explicit mapping and rollback process in `PACK_MIGRATION.md`.

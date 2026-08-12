@@ -1,395 +1,88 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Search, Minus, Plus, ShoppingBag, X, Check } from 'lucide-react';
 import { db, createSale } from '../db';
-import type { Item, Variant, Sale } from '../types';
+import type { ModelColour, Pack, ProductModel, Sale } from '../types';
 import { Receipt } from './Receipt';
 import { colorSwatch } from '../colorSwatch';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AnimatedTitle } from '../components/AnimatedTitle';
 import { NumberInput } from '../components/NumberInput';
+import { addMoney, compareMoney, discountedMoney, formatMoney, multiplyMoney, normalizeDecimal, subtractMoney } from '../money';
+import { addPackLine, type CartLine } from '../cart';
 
-type Cart = { item: Item; variant: Variant; quantity: number; price: number };
 export function Sell() {
-  const [q, setQ] = useState(''),
-    [cart, setCart] = useState<Cart[]>([]),
-    [receipt, setReceipt] = useState<Sale | null>(null);
-  const [customerName, setCustomerName] = useState(''),
-    [customerPhone, setCustomerPhone] = useState(''),
-    [shopName, setShopName] = useState(''),
-    [customerAddress, setCustomerAddress] = useState('');
-  const [discount, setDiscount] = useState(0),
-    [partialPayment, setPartialPayment] = useState(false),
-    [deposit, setDeposit] = useState(0),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  const items =
-    useLiveQuery(() => db.items.filter((i) => !i.deletedAt).toArray()) ?? [];
-  const results = items.filter(
-    (i) =>
-      i.modelNumber.toLowerCase().includes(q.toLowerCase()) ||
-      i.variants.some(
-        (v) =>
-          v.color.toLowerCase().includes(q.toLowerCase()) ||
-          v.size.toLowerCase().includes(q.toLowerCase()),
-      ),
-  );
-  const inCart = (variantId: string) =>
-    cart.find((line) => line.variant.id === variantId)?.quantity ?? 0;
-  const remaining = (variant: Variant) =>
-    Math.max(0, variant.stockQuantity - inCart(variant.id));
-  const add = (item: Item, v: Variant) =>
-    setCart((c) => {
-      const n = c.find((x) => x.variant.id === v.id);
-      if ((n?.quantity ?? 0) >= v.stockQuantity) return c;
-      return n
-        ? c.map((x) =>
-            x === n
-              ? { ...x, quantity: Math.min(x.quantity + 1, v.stockQuantity) }
-              : x,
-          )
-        : [...c, { item, variant: v, quantity: 1, price: item.price }];
-    });
-  const totalPieces = cart.reduce((sum, line) => sum + line.quantity, 0),
-    subtotal = cart.reduce((s, x) => s + x.quantity * x.price, 0),
-    discountAmount = (subtotal * discount) / 100,
-    total = Math.round((subtotal - discountAmount) * 100) / 100;
+  const [q, setQ] = useState(''), [cart, setCart] = useState<CartLine[]>([]), [receipt, setReceipt] = useState<Sale | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState(''), [selectedColourId, setSelectedColourId] = useState(''), [selectedPackId, setSelectedPackId] = useState(''), [numberOfPacks, setNumberOfPacks] = useState(1);
+  const [customerName, setCustomerName] = useState(''), [customerPhone, setCustomerPhone] = useState(''), [shopName, setShopName] = useState(''), [customerAddress, setCustomerAddress] = useState('');
+  const [discount, setDiscount] = useState('0'), [partialPayment, setPartialPayment] = useState(false), [deposit, setDeposit] = useState('0.00'), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const models = useLiveQuery(() => db.models.filter(model => model.isActive).toArray()) ?? [];
+  const results = models.filter(model => model.modelNumber.toLowerCase().includes(q.toLowerCase()) || model.colours.some(colour => colour.name.toLowerCase().includes(q.toLowerCase())));
+  const selectedModel = models.find(model => model.id === selectedModelId);
+  const selectedColour = selectedModel?.colours.find(colour => colour.id === selectedColourId && colour.isActive);
+  const selectedPack = selectedColour?.packs.find(pack => pack.id === selectedPackId && pack.isActive);
+  const inCart = (packId: string) => cart.find(line => line.pack.id === packId)?.numberOfPacks ?? 0;
+  const packsRemaining = (pack: Pack) => Math.max(0, pack.stockQuantity - inCart(pack.id));
+
+  const addSelected = () => {
+    if (!selectedModel || !selectedColour || !selectedPack) return;
+    const available = packsRemaining(selectedPack);
+    const quantity = Math.min(Math.max(1, Math.trunc(numberOfPacks)), available);
+    if (quantity <= 0) return;
+    setCart(current => addPackLine(current, selectedModel, selectedColour, selectedPack, quantity));
+    setNumberOfPacks(1);
+  };
+
+  const subtotal = useMemo(() => cart.reduce((sum, line) => addMoney(sum, multiplyMoney(multiplyMoney(line.model.price, line.pack.sizesPerPack), line.numberOfPacks)), '0.00'), [cart]);
+  const totals = discountedMoney(subtotal, discount);
+  const totalPacks = cart.reduce((sum, line) => sum + line.numberOfPacks, 0);
+  const representedSizes = cart.reduce((sum, line) => sum + line.numberOfPacks * line.pack.sizesPerPack, 0);
+
   const complete = async () => {
     setError('');
-    if (partialPayment && (deposit < 0 || deposit > total)) {
-      setError('Deposit must be between 0 and the receipt total.');
-      return;
-    }
+    const normalizedDeposit = normalizeDecimal(deposit);
+    if (partialPayment && (compareMoney(normalizedDeposit, '0') < 0 || compareMoney(normalizedDeposit, totals.total) > 0)) { setError('Deposit must be between 0 and the receipt total.'); return; }
     setBusy(true);
     try {
-      const sale = await createSale(
-        cart.map((x) => ({
-          variant: x.variant,
-          item: x.item,
-          quantity: x.quantity,
-          price: x.price,
-        })),
-        {
-          customerName,
-          customerPhone,
-          shopName,
-          customerAddress,
-          discountPercentage: discount,
-          depositAmount: partialPayment ? deposit : undefined,
-        },
-      );
-      sale.items = sale.items.map((l) => ({
-        ...l,
-        itemVariant: {
-          ...cart.find((x) => x.variant.id === l.itemVariantId)!.variant,
-          item: cart.find((x) => x.variant.id === l.itemVariantId)!.item,
-        },
-      }));
-      setCart([]);
-      setCustomerName('');
-      setCustomerPhone('');
-      setShopName('');
-      setCustomerAddress('');
-      setDiscount(0);
-      setPartialPayment(false);
-      setDeposit(0);
-      setReceipt(sale);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : 'Could not complete the sale.',
-      );
-    } finally {
-      setBusy(false);
-    }
+      const sale = await createSale(cart.map(line => ({ modelId: line.model.id, colourId: line.colour.id, packId: line.pack.id, numberOfPacks: line.numberOfPacks })), {
+        customerName, customerPhone, shopName, customerAddress,
+        discountPercentage: normalizeDecimal(discount),
+        depositAmount: partialPayment ? normalizedDeposit : undefined,
+      });
+      setCart([]); setCustomerName(''); setCustomerPhone(''); setShopName(''); setCustomerAddress(''); setDiscount('0'); setPartialPayment(false); setDeposit('0.00'); setReceipt(sale);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not complete the sale.'); }
+    finally { setBusy(false); }
   };
-  if (receipt)
-    return <Receipt sale={receipt} onClose={() => setReceipt(null)} />;
-  return (
-    <div className='sell-layout'>
-      <section>
-        <div className='section-head compact'>
-          <div>
-            <p className='eyebrow'>NEW TRANSACTION</p>
-            <AnimatedTitle>Select a dress</AnimatedTitle>
-          </div>
-        </div>
-        <div className='search'>
-          <Search />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder='Model or colour…'
-          />
-        </div>
-        <div className='sell-list'>
-          {results.map((item) => (
-            <article key={item.id}>
-              <div className='sell-product'>
-                <div className='model-badge'>
-                  {item.photoUrl ? (
-                    <img src={item.photoUrl} alt={`Model ${item.modelNumber}`} />
-                  ) : (
-                    <span>{item.modelNumber.slice(0, 2).toUpperCase()}</span>
-                  )}
-                </div>
-                <div className='sell-product-copy'>
-                  <strong>Model: {item.modelNumber}</strong>
-                  <span>EGP {item.price.toLocaleString()}</span>
-                </div>
-              </div>
-              <div className='variant-buttons'>
-                {item.variants.map((v) => {
-                  const left=remaining(v),out=left===0;
-                  return (
-                    <button key={v.id} onClick={() => add(item, v)} disabled={out} className={out?'out-of-stock':''}>
-                      <span>
-                        <i
-                          className='color-swatch'
-                          style={{ backgroundColor: colorSwatch(v.color) }}
-                          aria-hidden='true'
-                        />
-                        {v.size} / {v.color}
-                      </span>
-                      <small>{out?'Out of stock':`${left} left`}</small>
-                      {!out&&<Plus size={16} />}
-                    </button>
-                  )})}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-      <aside className='basket'>
-        <header>
-          <ShoppingBag />
-          <div>
-            <p className='eyebrow'>CURRENT SALE</p>
-            <h2>Your basket</h2>
-          </div>
-          <span>{totalPieces}</span>
-        </header>
-        {!cart.length ? (
-          <div className='basket-empty'>
-            <ShoppingBag />
-            <p>Select a size and colour to begin the sale.</p>
-          </div>
-        ) : (
-          <motion.div className='basket-lines' layout>
-            <AnimatePresence initial={false}>{cart.map((x, n) => (
-              <motion.article key={x.variant.id} layout initial={{opacity:0,x:-16}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-10}} transition={{duration:.35,ease:[.22,1,.36,1]}}>
-                <div>
-                  <b>{x.item.modelNumber}</b>
-                  <span>
-                    <i
-                      className='color-swatch'
-                      style={{ backgroundColor: colorSwatch(x.variant.color) }}
-                      aria-hidden='true'
-                    />
-                    {x.variant.size} / {x.variant.color}
-                  </span>
-                </div>
-                <div className='quantity'>
-                  <button
-                    onClick={() =>
-                      setCart((c) =>
-                        c.map((z, i) =>
-                          i === n
-                            ? { ...z, quantity: Math.max(1, z.quantity - 1) }
-                            : z,
-                        ),
-                      )
-                    }
-                  >
-                    <Minus />
-                  </button>
-                  <NumberInput
-                    className='quantity-input'
-                    min='1'
-                    max={x.variant.stockQuantity}
-                    step='1'
-                    value={x.quantity}
-                    aria-label={'Quantity for '+x.item.modelNumber+', '+x.variant.size+' / '+x.variant.color}
-                    onChange={(e) =>
-                      setCart((c) =>
-                        c.map((z, i) =>
-                          i === n
-                            ? {
-                                ...z,
-                                quantity: Math.min(
-                                  z.variant.stockQuantity,
-                                  Math.max(1, Number(e.target.value) || 1),
-                                ),
-                              }
-                            : z,
-                        ),
-                      )
-                    }
-                  />
-                  <button
-                    onClick={() =>
-                      setCart((c) =>
-                        c.map((z, i) =>
-                          i === n
-                            ? {
-                                ...z,
-                                quantity: Math.min(
-                                  z.quantity + 1,
-                                  z.variant.stockQuantity,
-                                ),
-                              }
-                            : z,
-                        ),
-                      )
-                    }
-                  >
-                    <Plus />
-                  </button>
-                </div>
-                <label>
-                  <NumberInput
-                    min='0'
-                    value={x.price}
-                    onChange={(e) =>
-                      setCart((c) =>
-                        c.map((z, i) =>
-                          i === n ? { ...z, price: Number(e.target.value) } : z,
-                        ),
-                      )
-                    }
-                  />{' '}
-                  EGP
-                </label>
-                <button
-                  className='remove'
-                  onClick={() => setCart((c) => c.filter((_, i) => i !== n))}
-                >
-                  <X />
-                </button>
-              </motion.article>
-            ))}</AnimatePresence>
-          </motion.div>
-        )}
-        <div className='checkout-details client-details'>
-          <label>
-            Client name
-            <input
-              value={customerName}
-              maxLength={120}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder='Optional'
-            />
-          </label>
-          <label>
-            Phone number
-            <input
-              type='tel'
-              value={customerPhone}
-              maxLength={40}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder='Optional'
-            />
-          </label>
-          <label>
-            Shop name
-            <input
-              value={shopName}
-              maxLength={120}
-              onChange={(e) => setShopName(e.target.value)}
-              placeholder='Optional'
-            />
-          </label>
-          <label>
-            Address
-            <input
-              value={customerAddress}
-              maxLength={500}
-              onChange={(e) => setCustomerAddress(e.target.value)}
-              placeholder='Optional'
-            />
-          </label>
-          <label>
-            Discount percentage
-            <div className='discount-input'>
-              <NumberInput
-                min='0'
-                max='100'
-                step='0.5'
-                value={discount}
-                onChange={(e) =>
-                  setDiscount(
-                    Math.min(100, Math.max(0, Number(e.target.value))),
-                  )
-                }
-              />
-              <span>%</span>
-            </div>
-          </label>
-          <label className='payment-toggle'>
-            <input
-              type='checkbox'
-              checked={partialPayment}
-              onChange={(e) => {
-                setPartialPayment(e.target.checked);
-                setDeposit(0);
-              }}
-            />{' '}
-            Client is paying a deposit
-          </label>
-          {partialPayment && (
-            <label className='wide'>
-              Deposit paid now
-              <NumberInput
-                min='0'
-                max={total}
-                step='0.01'
-                value={deposit}
-                onChange={(e) => setDeposit(Number(e.target.value))}
-              />
-              <small>
-                Outstanding: {Math.max(0, total - deposit).toLocaleString()} EGP
-              </small>
-            </label>
-          )}
-        </div>
-        <footer>
-          {discount > 0 && (
-            <>
-              <div className='checkout-row'>
-                <span>Subtotal</span>
-                <b>{subtotal.toLocaleString()} EGP</b>
-              </div>
-              <div className='checkout-row discount'>
-                <span>Discount ({discount}%)</span>
-                <b>− {discountAmount.toLocaleString()} EGP</b>
-              </div>
-            </>
-          )}
-          <div className='basket-pieces'>
-            <span>Total Pcs</span>
-            <b>{totalPieces}</b>
-          </div>
-          <div>
-            <span>Total</span>
-            <strong>
-              {total.toLocaleString()} <small>EGP</small>
-            </strong>
-          </div>
-          {partialPayment && (
-            <div className='checkout-row payment'>
-              <span>Paid now</span>
-              <b>{deposit.toLocaleString()} EGP</b>
-            </div>
-          )}
-          {error && <p className='error'>{error}</p>}
-          <button
-            className='primary sale-button'
-            disabled={!cart.length || busy}
-            onClick={complete}
-          >
-            <Check /> {busy ? 'Completing…' : 'Complete sale'}
-          </button>
-        </footer>
-      </aside>
-    </div>
-  );
+
+  if (receipt) return <Receipt sale={receipt} onClose={() => setReceipt(null)}/>;
+  return <div className="sell-layout">
+    <section>
+      <div className="section-head compact"><div><p className="eyebrow">NEW TRANSACTION</p><AnimatedTitle>Select packs</AnimatedTitle><p>Model → colour → pack → number of packs</p></div></div>
+      <div className="search"><Search/><input value={q} onChange={event => setQ(event.target.value)} placeholder="Search model or colour..."/></div>
+      <div className="selection-flow">
+        <div><span>1 · Model</span><div className="model-options">{results.map(model => <button key={model.id} className={selectedModelId === model.id ? 'selected' : ''} onClick={() => { setSelectedModelId(model.id); setSelectedColourId(''); setSelectedPackId(''); }}><b>{model.modelNumber}</b><small>{formatMoney(model.price)} per size</small></button>)}</div></div>
+        {selectedModel && <div><span>2 · Colour</span><div className="variant-buttons">{selectedModel.colours.filter(colour => colour.isActive).map(colour => <button key={colour.id} className={selectedColourId === colour.id ? 'selected' : ''} onClick={() => { setSelectedColourId(colour.id); setSelectedPackId(''); }}><span><i className="color-swatch" style={{ backgroundColor: colorSwatch(colour.name) }}/>{colour.name}</span></button>)}</div></div>}
+        {selectedColour && <div><span>3 · Pack</span><div className="variant-buttons">{selectedColour.packs.filter(pack => pack.isActive).map(pack => { const left = packsRemaining(pack); return <button key={pack.id} disabled={!left} className={`${selectedPackId === pack.id ? 'selected ' : ''}${!left ? 'out-of-stock' : ''}`} onClick={() => setSelectedPackId(pack.id)}><span>{pack.sizesPerPack} sizes per pack</span><small>{formatMoney(multiplyMoney(selectedModel!.price, pack.sizesPerPack))} · {left} packs left</small></button>; })}</div></div>}
+        {selectedPack && <div className="pack-quantity"><span>4 · Number of packs</span><NumberInput min="1" max={packsRemaining(selectedPack)} step="1" value={numberOfPacks} onChange={event => setNumberOfPacks(Math.max(1, Number(event.target.value) || 1))}/><button className="primary" disabled={!packsRemaining(selectedPack)} onClick={addSelected}><Plus/> Add {numberOfPacks} {numberOfPacks === 1 ? 'pack' : 'packs'}</button><small>{selectedPack.sizesPerPack * numberOfPacks} represented sizes · {formatMoney(multiplyMoney(multiplyMoney(selectedModel!.price, selectedPack.sizesPerPack), numberOfPacks))}</small></div>}
+      </div>
+    </section>
+    <aside className="basket">
+      <header><ShoppingBag/><div><p className="eyebrow">CURRENT SALE</p><h2>Your basket</h2></div><span>{totalPacks}</span></header>
+      {!cart.length ? <div className="basket-empty"><ShoppingBag/><p>Select a model, colour, pack and number of packs.</p></div> : <motion.div className="basket-lines" layout><AnimatePresence initial={false}>{cart.map((line, index) => {
+        const packPrice = multiplyMoney(line.model.price, line.pack.sizesPerPack), lineTotal = multiplyMoney(packPrice, line.numberOfPacks);
+        return <motion.article key={line.pack.id} layout initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
+          <div><b>{line.model.modelNumber}</b><span><i className="color-swatch" style={{ backgroundColor: colorSwatch(line.colour.name) }}/>{line.colour.name} · {line.pack.sizesPerPack} sizes/pack</span><small>{formatMoney(packPrice)} per pack · {formatMoney(lineTotal)} line total · {line.pack.stockQuantity - line.numberOfPacks} remaining</small></div>
+          <div className="quantity"><button onClick={() => setCart(current => current.map((entry, position) => position === index ? { ...entry, numberOfPacks: Math.max(1, entry.numberOfPacks - 1) } : entry))}><Minus/></button><NumberInput className="quantity-input" min="1" max={line.pack.stockQuantity} step="1" value={line.numberOfPacks} aria-label={`Number of packs for ${line.model.modelNumber}, ${line.colour.name}`} onChange={event => setCart(current => current.map((entry, position) => position === index ? { ...entry, numberOfPacks: Math.min(entry.pack.stockQuantity, Math.max(1, Number(event.target.value) || 1)) } : entry))}/><button onClick={() => setCart(current => current.map((entry, position) => position === index ? { ...entry, numberOfPacks: Math.min(entry.numberOfPacks + 1, entry.pack.stockQuantity) } : entry))}><Plus/></button></div>
+          <button className="remove" onClick={() => setCart(current => current.filter((_, position) => position !== index))}><X/></button>
+        </motion.article>;
+      })}</AnimatePresence></motion.div>}
+      <div className="checkout-details client-details">
+        <label>Client name<input value={customerName} maxLength={120} onChange={event => setCustomerName(event.target.value)} placeholder="Optional"/></label><label>Phone number<input type="tel" value={customerPhone} maxLength={40} onChange={event => setCustomerPhone(event.target.value)} placeholder="Optional"/></label><label>Shop name<input value={shopName} maxLength={120} onChange={event => setShopName(event.target.value)} placeholder="Optional"/></label><label>Address<input value={customerAddress} maxLength={500} onChange={event => setCustomerAddress(event.target.value)} placeholder="Optional"/></label>
+        <label>Discount percentage<div className="discount-input"><NumberInput min="0" max="100" step="0.01" value={discount} onChange={event => setDiscount(event.target.value)}/><span>%</span></div></label>
+        <label className="payment-toggle"><input type="checkbox" checked={partialPayment} onChange={event => { setPartialPayment(event.target.checked); setDeposit('0.00'); }}/> Client is paying a deposit</label>
+        {partialPayment && <label className="wide">Deposit paid now<NumberInput min="0" max={totals.total} step="0.01" value={deposit} onChange={event => setDeposit(event.target.value)}/><small>Outstanding estimate: {formatMoney(compareMoney(totals.total, deposit) > 0 ? subtractMoney(totals.total, deposit) : '0.00')}</small></label>}
+      </div>
+      <footer>{compareMoney(totals.discount, '0') > 0 && <><div className="checkout-row"><span>Subtotal</span><b>{formatMoney(subtotal)}</b></div><div className="checkout-row discount"><span>Discount ({discount}%)</span><b>− {formatMoney(totals.discount)}</b></div></>}<div className="basket-pieces"><span>Total packs / represented sizes</span><b>{totalPacks} / {representedSizes}</b></div><div><span>Server-confirmed total at checkout</span><strong>{formatMoney(totals.total)}</strong></div>{partialPayment && <div className="checkout-row payment"><span>Paid now</span><b>{formatMoney(deposit)}</b></div>}{error && <p className="error">{error}</p>}<button className="primary sale-button" disabled={!cart.length || busy} onClick={complete}><Check/> {busy ? 'Completing…' : 'Complete sale'}</button></footer>
+    </aside>
+  </div>;
 }

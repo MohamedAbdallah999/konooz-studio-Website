@@ -47,6 +47,55 @@ model ItemVariant {
   @@map("item_variants")
 }
 
+model ProductModel {
+  id          String        @id @default(uuid()) @db.Uuid
+  modelNumber String        @map("model_number")
+  price       Decimal       @db.Decimal(12, 2)
+  photoUrl    String?       @map("photo_url")
+  material    String?
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  syncStatus  SyncStatus    @default(synced) @map("sync_status")
+  colours     ModelColour[]
+
+  @@index([modelNumber])
+  @@index([isActive, updatedAt])
+  @@map("models")
+}
+
+model ModelColour {
+  id         String       @id @default(uuid()) @db.Uuid
+  modelId    String       @map("model_id") @db.Uuid
+  name       String
+  isActive   Boolean      @default(true) @map("is_active")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+  syncStatus SyncStatus   @default(synced) @map("sync_status")
+  model      ProductModel @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  packs      Pack[]
+
+  @@index([modelId, isActive])
+  @@map("model_colours")
+}
+
+model Pack {
+  id            String      @id @default(uuid()) @db.Uuid
+  modelColourId String      @map("model_colour_id") @db.Uuid
+  sizesPerPack  Int         @map("sizes_per_pack")
+  stockQuantity Int         @default(0) @map("stock_quantity")
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  syncStatus    SyncStatus  @default(synced) @map("sync_status")
+  modelColour   ModelColour @relation(fields: [modelColourId], references: [id], onDelete: Restrict)
+  saleItems     SaleItem[]
+
+  @@index([modelColourId, isActive])
+  @@index([isActive, stockQuantity])
+  @@map("packs")
+}
+
 model Sale {
   id          String     @id @default(uuid()) @db.Uuid
   totalAmount        Decimal    @map("total_amount") @db.Decimal(12, 2)
@@ -68,17 +117,37 @@ model Sale {
 }
 
 model SaleItem {
-  id              String      @id @default(uuid()) @db.Uuid
-  saleId          String      @map("sale_id") @db.Uuid
-  itemVariantId   String      @map("item_variant_id") @db.Uuid
-  quantity        Int
-  unitPriceAtSale Decimal     @map("unit_price_at_sale") @db.Decimal(12, 2)
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
-  syncStatus      SyncStatus  @default(synced) @map("sync_status")
-  sale            Sale        @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  itemVariant     ItemVariant @relation(fields: [itemVariantId], references: [id])
+  id                     String       @id @default(uuid()) @db.Uuid
+  saleId                 String       @map("sale_id") @db.Uuid
+  itemVariantId          String?      @map("item_variant_id") @db.Uuid
+  quantity               Int?
+  unitPriceAtSale        Decimal?     @map("unit_price_at_sale") @db.Decimal(12, 2)
+  legacyModelIdAtSale    String?      @map("legacy_model_id_at_sale") @db.Uuid
+  legacyModelNumberAtSale String?     @map("legacy_model_number_at_sale")
+  legacyModelPriceAtSale Decimal?     @map("legacy_model_price_at_sale") @db.Decimal(12, 2)
+  legacyColourNameAtSale String?      @map("legacy_colour_name_at_sale")
+  legacySizeAtSale       String?      @map("legacy_size_at_sale")
+  modelIdAtSale          String?      @map("model_id_at_sale") @db.Uuid
+  modelNumberAtSale      String?      @map("model_number_at_sale")
+  modelPriceAtSale       Decimal?     @map("model_price_at_sale") @db.Decimal(12, 2)
+  colourIdAtSale         String?      @map("colour_id_at_sale") @db.Uuid
+  colourNameAtSale       String?      @map("colour_name_at_sale")
+  packId                 String?      @map("pack_id") @db.Uuid
+  sizesPerPackAtSale     Int?         @map("sizes_per_pack_at_sale")
+  packPriceAtSale        Decimal?     @map("pack_price_at_sale") @db.Decimal(12, 2)
+  numberOfPacks          Int?         @map("number_of_packs")
+  lineSubtotal           Decimal?     @map("line_subtotal") @db.Decimal(12, 2)
+  discountAllocation     Decimal?     @map("discount_allocation") @db.Decimal(12, 2)
+  finalLineTotal         Decimal?     @map("final_line_total") @db.Decimal(12, 2)
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
+  syncStatus             SyncStatus   @default(synced) @map("sync_status")
+  sale                   Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  itemVariant            ItemVariant? @relation(fields: [itemVariantId], references: [id], onDelete: Restrict)
+  pack                   Pack?        @relation(fields: [packId], references: [id], onDelete: Restrict)
 
+  @@index([saleId])
+  @@index([packId])
   @@map("sale_items")
 }
 

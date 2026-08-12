@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import { config } from './config.js';
 import { auth, errorHandler, notFound } from './middleware.js';
 import authRoutes from './auth.js';
-import itemRoutes from './items.js';
+import modelRoutes from './models.js';
 import saleRoutes from './sales.js';
 import stateRoutes from './state.js';
 import { prisma, prismaContext } from './db.js';
@@ -56,7 +56,7 @@ app.get('/health', async (_q, r, next) => {
   }
 });
 app.use('/api/auth', express.json({ limit: '32kb' }), authRoutes);
-app.use('/api/items', auth, express.json({ limit: '10mb' }), itemRoutes);
+app.use('/api/models', auth, express.json({ limit: '10mb' }), modelRoutes);
 app.use('/api/sales', auth, express.json({ limit: '2mb' }), saleRoutes);
 app.use('/api/state', auth, stateRoutes);
 app.use(notFound);

@@ -124,6 +124,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .basket footer .basket-pieces{font-size:11px;color:var(--muted);margin-bottom:7px}
 .basket footer .basket-pieces b{color:var(--ink);font-size:12px}
 .receipt-payment .receipt-pieces{font-size:10px;color:var(--muted)}
+.receipt-meta .refunded,.ledger i.refunded{color:#9a2f24;font-weight:800;text-transform:uppercase}
 .receipt-payment .receipt-pieces b{color:var(--ink)}
 
 /* Larger New Sale product previews with details below each photo. */
@@ -134,9 +135,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .sell-product-copy strong{font:600 21px/1.15 'Cormorant Garamond',serif;overflow-wrap:anywhere}
 .sell-product-copy span{font-size:12px;font-weight:700;color:var(--gold)}
 .sell-list .variant-buttons{align-self:center}
+.selection-flow{display:grid;gap:20px}.selection-flow>div{border:1px solid var(--line);background:var(--white);padding:18px}.selection-flow>div>span{display:block;margin-bottom:12px;font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}.model-options{display:flex;flex-wrap:wrap;gap:10px}.model-options button{display:grid;gap:4px;min-width:130px;padding:12px;border:1px solid var(--line);background:var(--white);text-align:left}.model-options button.selected,.variant-buttons button.selected{border-color:var(--gold);background:#b8963e12;box-shadow:0 0 0 2px #b8963e20}.model-options small{color:var(--muted)}.pack-quantity{display:grid!important;grid-template-columns:130px minmax(170px,auto) 1fr;align-items:end;gap:12px}.pack-quantity>span{grid-column:1/-1}.pack-quantity input{min-height:46px}.pack-quantity small{color:var(--muted)}.basket-lines article>div:first-child small{display:block;margin-top:4px;color:var(--muted);font-size:9px}
 @media(max-width:600px){
   .sell-list article{grid-template-columns:1fr}
   .sell-product{width:min(240px,100%)}
   .sell-product .model-badge{min-height:180px}
   .sell-list .variant-buttons{grid-column:1;width:100%;max-width:none}
+  .pack-quantity{grid-template-columns:1fr}.pack-quantity>span{grid-column:auto}.model-options{display:grid;grid-template-columns:1fr 1fr}.model-options button{min-width:0}
 }
