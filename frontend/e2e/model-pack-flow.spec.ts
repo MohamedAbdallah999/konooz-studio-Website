@@ -135,6 +135,8 @@ test('completes one sale with multiple models and multiple colours', async ({ pa
     await addLine(firstModelNumber, 'Gold', 3);
     await addLine(secondModelNumber, 'Blue', 4);
     await expect(page.locator('.basket-lines article')).toHaveCount(3);
+    await expect(page.locator('.basket-pieces')).toContainText('Total packs / total pcs.');
+    await expect(page.locator('.basket-pieces')).toContainText('3 / 9');
     await page.getByLabel('Client name').fill(`Multi-line customer ${suffix}`);
     await page.getByLabel('Discount percentage').fill('5.00');
     const responsePromise = page.waitForResponse(response => response.url().endsWith('/api/sales') && response.request().method() === 'POST');

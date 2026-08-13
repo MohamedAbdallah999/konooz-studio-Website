@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPackLine, type CartLine } from './cart';
+import { addPackLine, cartCounts, type CartLine } from './cart';
 import type { ModelColour, Pack, ProductModel } from './types';
 
 const time = '2026-08-12T00:00:00.000Z';
@@ -18,5 +18,6 @@ describe('cart line identity', () => {
     cart = addPackLine(cart, firstModel, gold, goldThree, 1);
     cart = addPackLine(cart, secondModel, colour('other-colour', secondModel.id), other, 1);
     expect(cart.map(line => [line.pack.id, line.numberOfPacks])).toEqual([['black-3', 3], ['black-6', 1], ['gold-3', 1], ['other-3', 1]]);
+    expect(cartCounts(cart)).toEqual({ totalPacks: 6, totalPieces: 21 });
   });
 });

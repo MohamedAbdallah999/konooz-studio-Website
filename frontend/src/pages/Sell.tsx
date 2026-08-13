@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AnimatedTitle } from '../components/AnimatedTitle';
 import { NumberInput } from '../components/NumberInput';
 import { addMoney, compareMoney, discountedMoney, formatMoney, multiplyMoney, normalizeDecimal, subtractMoney } from '../money';
-import { addPackLine, type CartLine } from '../cart';
+import { addPackLine, cartCounts, type CartLine } from '../cart';
 
 export function Sell() {
   const [q, setQ] = useState(''), [cart, setCart] = useState<CartLine[]>([]), [receipt, setReceipt] = useState<Sale | null>(null);
@@ -35,8 +35,7 @@ export function Sell() {
 
   const subtotal = useMemo(() => cart.reduce((sum, line) => addMoney(sum, multiplyMoney(multiplyMoney(line.model.price, line.pack.sizesPerPack), line.numberOfPacks)), '0.00'), [cart]);
   const totals = discountedMoney(subtotal, discount);
-  const totalPacks = cart.reduce((sum, line) => sum + line.numberOfPacks, 0);
-  const representedSizes = cart.reduce((sum, line) => sum + line.numberOfPacks * line.pack.sizesPerPack, 0);
+  const { totalPacks, totalPieces } = cartCounts(cart);
 
   const complete = async () => {
     setError('');
@@ -82,7 +81,7 @@ export function Sell() {
         <label className="payment-toggle"><input type="checkbox" checked={partialPayment} onChange={event => { setPartialPayment(event.target.checked); setDeposit('0.00'); }}/> Client is paying a deposit</label>
         {partialPayment && <label className="wide">Deposit paid now<NumberInput min="0" max={totals.total} step="0.01" value={deposit} onChange={event => setDeposit(event.target.value)}/><small>Outstanding estimate: {formatMoney(compareMoney(totals.total, deposit) > 0 ? subtractMoney(totals.total, deposit) : '0.00')}</small></label>}
       </div>
-      <footer>{compareMoney(totals.discount, '0') > 0 && <><div className="checkout-row"><span>Subtotal</span><b>{formatMoney(subtotal)}</b></div><div className="checkout-row discount"><span>Discount ({discount}%)</span><b>− {formatMoney(totals.discount)}</b></div></>}<div className="basket-pieces"><span>Total packs / represented sizes</span><b>{totalPacks} / {representedSizes}</b></div><div><span>Estimated total; server verifies at checkout</span><strong>{formatMoney(totals.total)}</strong></div>{partialPayment && <div className="checkout-row payment"><span>Paid now</span><b>{formatMoney(deposit)}</b></div>}{error && <p className="error" role="alert">{error}</p>}<button className="primary sale-button" disabled={!cart.length || busy} onClick={complete}><Check/> {busy ? 'Completing…' : 'Complete sale'}</button></footer>
+      <footer>{compareMoney(totals.discount, '0') > 0 && <><div className="checkout-row"><span>Subtotal</span><b>{formatMoney(subtotal)}</b></div><div className="checkout-row discount"><span>Discount ({discount}%)</span><b>− {formatMoney(totals.discount)}</b></div></>}<div className="basket-pieces"><span>Total packs / total pcs.</span><b>{totalPacks} / {totalPieces}</b></div><div><span>Estimated total; server verifies at checkout</span><strong>{formatMoney(totals.total)}</strong></div>{partialPayment && <div className="checkout-row payment"><span>Paid now</span><b>{formatMoney(deposit)}</b></div>}{error && <p className="error" role="alert">{error}</p>}<button className="primary sale-button" disabled={!cart.length || busy} onClick={complete}><Check/> {busy ? 'Completing…' : 'Complete sale'}</button></footer>
     </aside>
   </div>;
 }
