@@ -9,8 +9,10 @@ test.skip(!username || !password, 'Production credentials are required');
 
 test('production model, authoritative sale, immutable receipt, refund, and deactivation', async ({ page }) => {
   const consoleErrors: string[] = [];
+  const securityProbeErrors: string[] = [];
   const pageErrors: string[] = [];
-  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+  let securityProbeInFlight = false;
+  page.on('console', message => { if (message.type() === 'error') (securityProbeInFlight ? securityProbeErrors : consoleErrors).push(message.text()); });
   page.on('pageerror', error => pageErrors.push(error.message));
   const suffix = Date.now().toString(36).toUpperCase();
   const modelNumber = `PROD-SMOKE-${suffix}`;
@@ -49,6 +51,7 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await page.getByRole('button', { name: 'Save model' }).click();
   await expect(page.getByText(modelNumber, { exact: true })).toBeVisible();
 
+  securityProbeInFlight = true;
   const selected = await page.evaluate(async ({ apiUrl, expectedModel }) => {
     const token = sessionStorage.getItem('accessToken')!;
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -61,7 +64,9 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
     });
     return { modelId: model.id, colourId: colour.id, packId: pack.id, tamperedStatus: tampered.status };
   }, { apiUrl: api, expectedModel: modelNumber });
+  securityProbeInFlight = false;
   expect(selected.tamperedStatus).toBe(422);
+  expect(securityProbeErrors).toEqual([expect.stringContaining('422')]);
 
   await page.goto('/sell');
   await page.getByRole('button', { name: new RegExp(modelNumber) }).click();
