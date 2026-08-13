@@ -142,7 +142,7 @@ test('compact mobile layout keeps every route and every checkout field usable', 
   }
 });
 
-test('dense inventory cards stay compact and keep portrait photos fully visible', async ({ page }) => {
+test('dense inventory cards keep portrait photos fitted and offer an uncropped preview', async ({ page }) => {
   await installAuthenticatedState(page);
 
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1000, height: 800 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 320, height: 568 }]) {
@@ -151,7 +151,8 @@ test('dense inventory cards stay compact and keep portrait photos fully visible'
 
     const card = page.locator('.inventory-grid .item-card').first();
     const art = card.locator('.item-art');
-    const photo = art.locator('img');
+    const frame = art.locator('.item-photo-frame');
+    const photo = frame.locator('img');
     await expect(card).toBeVisible();
     await expect(photo).toHaveCSS('object-fit', 'contain');
     await expect(photo).toHaveCSS('object-position', '50% 50%');
@@ -159,19 +160,49 @@ test('dense inventory cards stay compact and keep portrait photos fully visible'
     await expect(card.getByText('Silk', { exact: true })).toBeVisible();
     await expect(card.getByText(/Midnight Black.*3 sizes.*30\.00 EGP.*4 packs/)).toBeVisible();
 
-    const [cardBox, artBox] = await Promise.all([card.boundingBox(), art.boundingBox()]);
-    expect(Math.round(artBox!.height)).toBe(viewport.width < 360 ? 168 : 180);
+    const [cardBox, artBox, frameBox, photoBox] = await Promise.all([card.boundingBox(), art.boundingBox(), frame.boundingBox(), photo.boundingBox()]);
+    expect(photoBox!.width).toBeLessThanOrEqual(artBox!.width);
+    expect(photoBox!.height).toBeLessThanOrEqual(artBox!.height);
+    expect(frameBox!.width).toBeLessThan(artBox!.width);
+    expect(frameBox!.height).toBeLessThan(artBox!.height);
     if (viewport.width > 700) {
+      expect(Math.round(artBox!.height)).toBe(180);
       expect(Math.round(cardBox!.height)).toBeGreaterThanOrEqual(180);
       expect(Math.round(artBox!.width)).toBe(viewport.width <= 1100 ? 145 : 160);
       await expect(card).toHaveCSS('flex-direction', 'row');
     } else {
-      expect(Math.abs(artBox!.width - cardBox!.width)).toBeLessThanOrEqual(2);
-      await expect(card).toHaveCSS('flex-direction', 'column');
+      expect(Math.round(artBox!.width)).toBe(96);
+      expect(Math.round(artBox!.height)).toBe(144);
+      expect(cardBox!.height).toBeLessThan(300);
+      await expect(card).toHaveCSS('display', 'grid');
+      const chipsBox = await card.locator('.chips').boundingBox();
+      expect(Math.abs(chipsBox!.width - cardBox!.width)).toBeLessThanOrEqual(2);
     }
 
     const editBox = await card.getByRole('button', { name: 'Edit LAYOUT-100' }).boundingBox();
     expect(editBox!.width).toBeGreaterThanOrEqual(viewport.width <= 700 ? 44 : 36);
+    const previewButton = card.getByRole('button', { name: 'Preview full photo for LAYOUT-100' });
+    await expect(previewButton).toBeVisible();
+    expect((await previewButton.boundingBox())!.height).toBeGreaterThanOrEqual(viewport.width <= 700 ? 44 : 36);
+    await previewButton.click();
+    const viewer = page.getByRole('dialog', { name: 'LAYOUT-100' });
+    const fullPhoto = viewer.getByAltText('Full photo of model LAYOUT-100');
+    await expect(viewer).toBeVisible();
+    await expect(fullPhoto).toHaveCSS('object-fit', 'contain');
+    const [viewerBox, fullPhotoBox] = await Promise.all([viewer.boundingBox(), fullPhoto.boundingBox()]);
+    expect(viewerBox!.width).toBeLessThanOrEqual(Math.min(640, viewport.width - 24));
+    expect(fullPhotoBox!.width).toBeLessThanOrEqual(viewerBox!.width);
+    expect(fullPhotoBox!.height).toBeLessThan(viewport.height);
+    await page.getByRole('button', { name: 'Close photo preview' }).click();
+    await expect(viewer).toBeHidden();
     await expectDocumentContained(page);
   }
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/inventory');
+  const hoverFrame = page.locator('.inventory-grid .item-photo-frame').first();
+  const beforeHover = await hoverFrame.boundingBox();
+  await hoverFrame.hover();
+  await expect.poll(async () => (await hoverFrame.boundingBox())!.width).toBeGreaterThan(beforeHover!.width * 1.3);
+  await expect(hoverFrame.locator('..')).toHaveCSS('overflow', 'visible');
 });

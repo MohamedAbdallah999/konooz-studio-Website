@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, Plus, Pencil, X, Trash2 } from 'lucide-react';
+import { Search, Plus, Pencil, X, Trash2, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, deleteModel, now, saveModel, uid } from '../db';
 import type { ModelColour, Pack, ProductModel } from '../types';
@@ -23,12 +23,22 @@ const blank = (): ProductModel => {
 
 export function Inventory() {
   const [q, setQ] = useState(''), [editing, setEditing] = useState<ProductModel | null>(null);
+  const [previewing, setPreviewing] = useState<ProductModel | null>(null);
   useEffect(() => {
-    if (!editing) return;
+    if (!editing && !previewing) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, [editing]);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (previewing) setPreviewing(null);
+      else setEditing(null);
+    };
+    addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      removeEventListener('keydown', closeOnEscape);
+    };
+  }, [editing, previewing]);
   const models = useLiveQuery(() => {
     const query = q.trim().toLowerCase();
     return db.models.filter(model => model.isActive && (!query || [model.modelNumber, model.price, model.material ?? '', ...model.colours.flatMap(colour => [colour.name, ...colour.packs.flatMap(pack => [String(pack.sizesPerPack), String(pack.stockQuantity)])])].some(value => value.toLowerCase().includes(query)))).reverse().sortBy('updatedAt');
@@ -51,10 +61,10 @@ export function Inventory() {
     <section className="section-head inventory-head"><div><p className="eyebrow">COLLECTION</p><AnimatedTitle>Inventory</AnimatedTitle><p>Models, colours, pack configurations and available packs.</p></div><button className="primary" onClick={() => setEditing(blank())}><Plus size={18}/> Add model</button></section>
     <div className="search inventory-search"><Search size={19}/><input aria-label="Search inventory" placeholder="Search model, colour, pack or material..." value={q} onChange={event => setQ(event.target.value)}/><span>{models.length} models</span></div>
     <div className="inventory-grid">{models.map(model => <motion.article layout key={model.id} className="item-card">
-      <div className="item-art">{model.photoUrl ? <img src={model.photoUrl} alt={`Model ${model.modelNumber}`}/> : <span>{model.modelNumber.slice(0, 2).toUpperCase()}</span>}<button onClick={() => setEditing(structuredClone(model))} aria-label={`Edit ${model.modelNumber}`}><Pencil size={16}/></button></div>
+      <div className="item-art">{model.photoUrl ? <div className="item-photo-frame" role="img" tabIndex={0} aria-label={`Photo of model ${model.modelNumber}`}><img src={model.photoUrl} alt={`Model ${model.modelNumber}`} draggable={false}/></div> : <span>{model.modelNumber.slice(0, 2).toUpperCase()}</span>}<button className="item-edit-button" onClick={() => setEditing(structuredClone(model))} aria-label={`Edit ${model.modelNumber}`}><Pencil size={16}/></button></div>
       <div className="item-info"><div className="item-heading"><div><small>MODEL</small><h3>{model.modelNumber}</h3><strong>{formatMoney(model.price)} base price</strong></div>{model.material && <span className="item-material">{model.material}</span>}</div>
         <div className="chips">{model.colours.flatMap(colour => colour.packs.map(pack => <span key={pack.id} className={pack.stockQuantity <= 0 ? 'stock-out' : pack.stockQuantity <= 3 ? 'stock-low' : ''}><i className="color-swatch" style={{ backgroundColor: colorSwatch(colour.name) }}/>{colour.name} · {pack.sizesPerPack} sizes · {formatMoney(multiplyMoney(model.price, pack.sizesPerPack))} · {pack.stockQuantity} packs</span>))}</div>
-        <div className="item-meta"><button onClick={() => remove(model)} aria-label={`Deactivate ${model.modelNumber}`}><Trash2 size={15}/></button></div>
+        <div className="item-meta">{model.photoUrl && <button className="item-preview-button" onClick={() => setPreviewing(model)} aria-label={`Preview full photo for ${model.modelNumber}`}><Maximize2 size={14}/><span>Preview</span></button>}<button className="item-delete-button" onClick={() => remove(model)} aria-label={`Deactivate ${model.modelNumber}`}><Trash2 size={15}/></button></div>
       </div>
     </motion.article>)}</div>
     {!models.length && <div className="empty"><div className="empty-icon">K</div><h3>No models found</h3><p>Try another search or add the first model.</p></div>}
@@ -81,6 +91,13 @@ export function Inventory() {
         </div>
         <footer><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button><button className="primary">Save model</button></footer>
       </motion.form>
+    </motion.div>}</AnimatePresence>
+    <AnimatePresence>{previewing?.photoUrl && <motion.div className="inventory-photo-viewer-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={event => event.target === event.currentTarget && setPreviewing(null)}>
+      <motion.section className="inventory-photo-viewer" role="dialog" aria-modal="true" aria-labelledby="inventory-photo-viewer-title" aria-describedby="inventory-photo-viewer-description" initial={{ y: 18, opacity: 0, scale: .98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 18, opacity: 0, scale: .98 }}>
+        <header><div><p className="eyebrow">MODEL PREVIEW</p><h2 id="inventory-photo-viewer-title">{previewing.modelNumber}</h2></div><button type="button" autoFocus onClick={() => setPreviewing(null)} aria-label="Close photo preview"><X size={21}/></button></header>
+        <div className="inventory-photo-viewer-image"><img src={previewing.photoUrl} alt={`Full photo of model ${previewing.modelNumber}`}/></div>
+        <p id="inventory-photo-viewer-description">Full photo shown without cropping.</p>
+      </motion.section>
     </motion.div>}</AnimatePresence>
   </div>;
 }
