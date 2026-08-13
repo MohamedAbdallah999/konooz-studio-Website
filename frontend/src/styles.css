@@ -107,10 +107,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 @media(max-width:390px){.variant-buttons{grid-template-columns:1fr}.sell-list article{grid-template-columns:54px minmax(0,1fr)}.model-badge{height:56px}.basket-lines article{grid-template-columns:1fr auto}.basket-lines article>label{grid-column:1/-1}.basket-lines .remove{grid-column:2;grid-row:1/3}}
 
 /* Inventory card edit control */
-.item-art button{right:12px;top:12px;width:38px;height:38px;padding:0;border:1px solid #ffffff90;background:#fffdf8e8;color:var(--espresso);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:0;box-shadow:0 8px 22px #17151124;backdrop-filter:blur(8px)}
-.item-art button svg{display:block;flex:none;margin:0}
-.item-art button:hover{background:var(--gold);border-color:var(--champagne);color:#fff;transform:translateY(-2px) rotate(-4deg) scale(1.05);box-shadow:0 11px 25px #17151138}
-.item-art button:active{transform:scale(.94)}
+.inventory-page .item-edit-button{position:absolute;right:8px;top:8px;z-index:6;width:36px;height:36px;min-width:36px;min-height:36px;padding:0;border:1px solid #ffffff90;background:#fffdf8e8;color:var(--espresso);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;line-height:0;box-shadow:0 8px 22px #17151124;backdrop-filter:blur(8px)}
+.inventory-page .item-edit-button svg{display:block;flex:none;margin:0}
+.inventory-page .item-edit-button:hover{background:var(--gold);border-color:var(--champagne);color:#fff;transform:translateY(-2px) rotate(-4deg) scale(1.05);box-shadow:0 11px 25px #17151138}
+.inventory-page .item-edit-button:active{transform:scale(.94)}
 
 .receipt-search{margin-top:18px}
 
@@ -270,9 +270,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 .inventory-page .item-photo-frame{position:absolute;inset:8px;z-index:1;display:grid;place-items:center;min-width:0;min-height:0;overflow:hidden;background:var(--ivory);transition:transform .28s ease,box-shadow .28s ease,background-color .28s ease}
 .inventory-page .item-photo-frame img{position:absolute;inset:0;display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center;background:transparent}
 .inventory-page .item-art>span{opacity:.45}
-.inventory-page .item-art .item-edit-button{z-index:5;width:36px;height:36px;min-width:36px;min-height:36px;right:8px;top:8px}
 .inventory-page .item-info{display:flex;flex:1;min-width:0;flex-direction:column;padding:14px}
-.inventory-page .item-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0}
+.inventory-page .item-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0;padding-right:42px}
 .inventory-page .item-heading>div{min-width:0}
 .inventory-page .item-heading small{font-size:8px;color:var(--gold);font-weight:700;letter-spacing:.1em}
 .inventory-page .item-heading h3{font-size:22px;line-height:1.05;margin:2px 0;overflow-wrap:anywhere}
@@ -312,13 +311,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   .inventory-page .item-art{grid-column:1;grid-row:1/3;align-self:start;flex:none;width:96px;height:144px;min-height:144px;border-right:1px solid var(--line);background:#e9e0d1}
   .inventory-page .item-photo-frame{inset:6px}
   .inventory-page .item-info{display:contents;padding:0}
-  .inventory-page .item-heading{grid-column:2;grid-row:1;min-width:0;flex-direction:column;justify-content:flex-start;gap:4px;padding:12px 12px 5px}
+  .inventory-page .item-heading{grid-column:2;grid-row:1;min-width:0;flex-direction:column;justify-content:flex-start;gap:4px;padding:12px 60px 5px 12px}
   .inventory-page .item-heading h3{font-size:20px}
   .inventory-page .item-material{max-width:100%;font-size:9px;text-align:left}
   .inventory-page .chips{grid-column:1/-1;grid-row:3;margin:0;padding:11px 12px;border-top:1px solid var(--line)}
   .inventory-page .item-meta{grid-column:2;grid-row:2;align-self:end;min-height:50px;margin:0;padding:0 7px 6px 12px;border-top:0}
-  .inventory-page .item-art .item-edit-button,.inventory-page .item-meta button{width:44px;height:44px;min-width:44px;min-height:44px}
-  .inventory-page .item-art .item-edit-button{right:6px;top:6px}
+  .inventory-page .item-edit-button,.inventory-page .item-meta button{width:44px;height:44px;min-width:44px;min-height:44px}
   .inventory-page .item-meta .item-preview-button{width:auto;padding:0 9px}
   .inventory-photo-viewer-backdrop{padding:12px}
   .inventory-photo-viewer{max-height:calc(100dvh - 24px)}

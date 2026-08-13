@@ -181,6 +181,8 @@ test('dense inventory cards keep portrait photos fitted and offer an uncropped p
 
     const editBox = await card.getByRole('button', { name: 'Edit LAYOUT-100' }).boundingBox();
     expect(editBox!.width).toBeGreaterThanOrEqual(viewport.width <= 700 ? 44 : 36);
+    expect(Math.abs(editBox!.x + editBox!.width - (cardBox!.x + cardBox!.width - 8))).toBeLessThanOrEqual(2);
+    expect(Math.abs(editBox!.y - (cardBox!.y + 8))).toBeLessThanOrEqual(2);
     const previewButton = card.getByRole('button', { name: 'Preview full photo for LAYOUT-100' });
     await expect(previewButton).toBeVisible();
     expect((await previewButton.boundingBox())!.height).toBeGreaterThanOrEqual(viewport.width <= 700 ? 44 : 36);
