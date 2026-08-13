@@ -10,6 +10,7 @@ import { formatMoney, multiplyMoney, normalizeDecimal } from '../money';
 import './Inventory.css';
 import { AnimatedTitle } from '../components/AnimatedTitle';
 import { NumberInput } from '../components/NumberInput';
+import { confirmDestructiveAction } from '../confirmDestructiveAction';
 
 const newPack = (modelColourId: string): Pack => ({ id: uid(), modelColourId, sizesPerPack: 1, stockQuantity: 0, isActive: true, createdAt: now(), updatedAt: now(), syncStatus: 'pending' });
 const newColour = (modelId: string): ModelColour => {
@@ -51,9 +52,24 @@ export function Inventory() {
     catch (error) { alert(error instanceof Error ? error.message : 'Unable to save this model.'); }
   };
   const remove = async (model: ProductModel) => {
-    if (!confirm(`Deactivate model ${model.modelNumber} and all of its packs?`)) return;
+    if (!confirmDestructiveAction(
+      `Deactivate model ${model.modelNumber} and all of its packs?`,
+      `Final confirmation: deactivate model ${model.modelNumber} now? It will disappear from inventory.`,
+    )) return;
     try { await deleteModel(model); } catch (error) { alert(error instanceof Error ? error.message : 'Unable to deactivate this model.'); }
   };
+  const removePhoto = () => editing && confirmDestructiveAction(
+    `Remove the photo from model ${editing.modelNumber || 'this model'}?`,
+    'Final confirmation: remove this model photo now?',
+  ) && setEditing({ ...editing, photoUrl: '' });
+  const removeColour = (colour: ModelColour) => editing && confirmDestructiveAction(
+    `Remove colour ${colour.name || 'this colour'} and all of its packs?`,
+    `Final confirmation: remove colour ${colour.name || 'this colour'} from this model now?`,
+  ) && updateColour(colour.id, { isActive: false, packs: colour.packs.map(pack => ({ ...pack, isActive: false })) });
+  const removePack = (colour: ModelColour, pack: Pack) => confirmDestructiveAction(
+    `Remove the ${pack.sizesPerPack}-size pack configuration from ${colour.name || 'this colour'}?`,
+    'Final confirmation: remove this pack configuration now?',
+  ) && updatePack(colour.id, pack.id, { isActive: false });
   const updateColour = (colourId: string, changes: Partial<ModelColour>) => editing && setEditing({ ...editing, colours: editing.colours.map(colour => colour.id === colourId ? { ...colour, ...changes } : colour) });
   const updatePack = (colourId: string, packId: string, changes: Partial<Pack>) => editing && setEditing({ ...editing, colours: editing.colours.map(colour => colour.id === colourId ? { ...colour, packs: colour.packs.map(pack => pack.id === packId ? { ...pack, ...changes } : pack) } : colour) });
 
@@ -75,17 +91,17 @@ export function Inventory() {
         <div className="form-grid">
           <label>Model number<input autoFocus value={editing.modelNumber} onChange={event => setEditing({ ...editing, modelNumber: event.target.value })} required/></label>
           <label>Base price per size (EGP)<NumberInput inputMode="decimal" min="0" step="0.01" value={editing.price} onChange={event => setEditing({ ...editing, price: event.target.value })} required/></label>
-          <label>Model photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; try { setEditing({ ...editing, photoUrl: await optimizeModelPhoto(file) }); } catch (error) { alert(error instanceof Error ? error.message : 'Unable to process this image.'); event.target.value = ''; } }}/><small>JPEG, PNG, or WebP up to 15 MB. Large photos are optimized automatically.</small>{editing.photoUrl && <span className="photo-preview"><img src={editing.photoUrl} alt="Selected model preview"/><button type="button" onClick={() => setEditing({ ...editing, photoUrl: '' })}>Remove photo</button></span>}</label>
+          <label>Model photo<input type="file" accept="image/jpeg,image/png,image/webp" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; try { setEditing({ ...editing, photoUrl: await optimizeModelPhoto(file) }); } catch (error) { alert(error instanceof Error ? error.message : 'Unable to process this image.'); event.target.value = ''; } }}/><small>JPEG, PNG, or WebP up to 15 MB. Large photos are optimized automatically.</small>{editing.photoUrl && <span className="photo-preview"><img src={editing.photoUrl} alt="Selected model preview"/><button type="button" onClick={removePhoto}>Remove photo</button></span>}</label>
           <label>Fabric / material<textarea value={editing.material ?? ''} onChange={event => setEditing({ ...editing, material: event.target.value })}/></label>
         </div>
         <div className="variants model-colours"><div><div><h3>Colours and packs</h3><small>Stock is the number of available packs. Pack price is calculated from sizes per pack.</small></div><button type="button" onClick={() => setEditing({ ...editing, colours: [...editing.colours, newColour(editing.id)] })}><Plus size={15}/> Add colour</button></div>
           {editing.colours.filter(colour => colour.isActive).map(colour => <section className="colour-editor" key={colour.id}>
-            <header><label>Colour name<input placeholder="Colour" value={colour.name} onChange={event => updateColour(colour.id, { name: event.target.value })} required/></label><button type="button" disabled={editing.colours.filter(entry => entry.isActive).length === 1} onClick={() => updateColour(colour.id, { isActive: false, packs: colour.packs.map(pack => ({ ...pack, isActive: false })) })} aria-label="Remove colour"><X size={17}/></button></header>
+            <header><label>Colour name<input placeholder="Colour" value={colour.name} onChange={event => updateColour(colour.id, { name: event.target.value })} required/></label><button type="button" disabled={editing.colours.filter(entry => entry.isActive).length === 1} onClick={() => removeColour(colour)} aria-label="Remove colour"><X size={17}/></button></header>
             {colour.packs.filter(pack => pack.isActive).map(pack => <div className="pack-row" key={pack.id}>
               <label>Sizes per pack<NumberInput inputMode="numeric" min="1" step="1" value={pack.sizesPerPack} onChange={event => updatePack(colour.id, pack.id, { sizesPerPack: Number(event.target.value) })} required/></label>
               <label>Packs available<NumberInput inputMode="numeric" min="0" step="1" value={pack.stockQuantity} onChange={event => updatePack(colour.id, pack.id, { stockQuantity: Number(event.target.value) })} required/></label>
               <span>Pack price <b>{formatMoney(multiplyMoney(editing.price, pack.sizesPerPack))}</b></span>
-              <button type="button" disabled={colour.packs.filter(entry => entry.isActive).length === 1} onClick={() => updatePack(colour.id, pack.id, { isActive: false })} aria-label="Remove pack"><X size={17}/></button>
+              <button type="button" disabled={colour.packs.filter(entry => entry.isActive).length === 1} onClick={() => removePack(colour, pack)} aria-label="Remove pack"><X size={17}/></button>
             </div>)}
             <button className="add-pack" type="button" onClick={() => updateColour(colour.id, { packs: [...colour.packs, newPack(colour.id)] })}><Plus size={14}/> Add pack</button>
           </section>)}

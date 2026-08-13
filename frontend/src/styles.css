@@ -132,7 +132,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 .sell-product-copy strong{font:600 21px/1.15 'Cormorant Garamond',serif;overflow-wrap:anywhere}
 .sell-product-copy span{font-size:12px;font-weight:700;color:var(--gold)}
 .sell-list .variant-buttons{align-self:center}
-.selection-flow{display:grid;gap:20px}.selection-flow>div{border:1px solid var(--line);background:var(--white);padding:18px}.selection-flow>div>span{display:block;margin-bottom:12px;font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}.model-options{display:flex;flex-wrap:wrap;gap:10px}.model-options button{display:grid;gap:4px;min-width:130px;padding:12px;border:1px solid var(--line);background:var(--white);text-align:left}.model-options button.selected,.variant-buttons button.selected{border-color:var(--gold);background:#b8963e12;box-shadow:0 0 0 2px #b8963e20}.model-options small{color:var(--muted)}.pack-quantity{display:grid!important;grid-template-columns:130px minmax(170px,auto) 1fr;align-items:end;gap:12px}.pack-quantity>span{grid-column:1/-1}.pack-quantity input{min-height:46px}.pack-quantity small{color:var(--muted)}.basket-lines article>div:first-child small{display:block;margin-top:4px;color:var(--muted);font-size:9px}
+.selection-flow{display:grid;gap:20px}.selection-flow>div{border:1px solid var(--line);background:var(--white);padding:18px}.selection-flow>div>span{display:block;margin-bottom:12px;font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}.model-options{display:flex;flex-wrap:wrap;gap:10px}.model-options button{display:grid;grid-template-columns:36px minmax(0,1fr);align-items:center;gap:8px;min-width:150px;padding:8px;border:1px solid var(--line);background:var(--white);text-align:left}.model-options button.selected,.variant-buttons button.selected{border-color:var(--gold);background:#b8963e12;box-shadow:0 0 0 2px #b8963e20}.sale-model-thumb{position:relative;display:grid;width:36px;height:36px;min-width:36px;min-height:36px;max-width:36px;max-height:36px;place-items:center;overflow:hidden;border:1px solid var(--line);background:var(--ivory);color:var(--gold);font-size:9px;font-weight:800}.sale-model-thumb img{position:absolute;inset:2px;display:block;width:calc(100% - 4px);height:calc(100% - 4px);min-width:0;min-height:0;max-width:calc(100% - 4px);max-height:calc(100% - 4px);object-fit:contain;object-position:center}.sale-model-copy{display:grid;min-width:0;gap:3px}.sale-model-copy b,.sale-model-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.model-options small{color:var(--muted)}.pack-quantity{display:grid!important;grid-template-columns:130px minmax(170px,auto) 1fr;align-items:end;gap:12px}.pack-quantity>span{grid-column:1/-1}.pack-quantity input{min-height:46px}.pack-quantity small{color:var(--muted)}.basket-lines article>div:first-child small{display:block;margin-top:4px;color:var(--muted);font-size:9px}
 @media(max-width:600px){
   .sell-list article{grid-template-columns:1fr}
   .sell-product{width:min(240px,100%)}
@@ -328,3 +328,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   .inventory-photo-viewer>header{padding-inline:14px}
   .inventory-photo-viewer-image{min-height:210px;padding:9px}
 }
+
+/* Compact model-photo previews in Sales ledger rows. */
+.ledger article{grid-template-columns:52px minmax(0,1fr) 100px 140px 80px;min-height:66px;padding:9px 0}
+.ledger article>div:nth-child(2){min-width:0}
+.ledger article>div:nth-child(2)>b,.ledger article>div:nth-child(2)>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ledger-model-preview{position:relative;display:grid;width:46px;height:46px;min-width:46px;min-height:46px;max-width:46px;max-height:46px;place-items:center;overflow:hidden;border:1px solid var(--line);background:var(--ivory);color:var(--gold)}
+.ledger-model-preview img{position:absolute;inset:3px;display:block;width:calc(100% - 6px);height:calc(100% - 6px);min-width:0;min-height:0;max-width:calc(100% - 6px);max-height:calc(100% - 6px);object-fit:contain;object-position:center}
+.ledger-model-preview>span{position:absolute;right:0;bottom:0;display:grid;min-width:17px;height:17px;place-items:center;padding:0 3px;background:var(--ink);color:#fff;font-size:8px;font-weight:800;line-height:1}
+.ledger-model-label{margin-right:6px;color:var(--gold);font-size:9px}
+@media screen and (max-width:900px){.ledger article{grid-template-columns:48px minmax(0,1fr) auto}}

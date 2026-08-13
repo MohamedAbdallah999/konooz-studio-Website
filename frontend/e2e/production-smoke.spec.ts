@@ -136,13 +136,17 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await expect(page.locator('.receipt').getByText(modelNumber, { exact: true })).toBeVisible();
   await expect(page.locator('.receipt').getByText(/Black.*3 items per pack/)).toBeVisible();
 
-  page.once('dialog', dialog => dialog.accept());
+  let confirmations = 0;
+  const acceptConfirmation = async (dialog: import('@playwright/test').Dialog) => { confirmations += 1; await dialog.accept(); };
+  page.on('dialog', acceptConfirmation);
   await page.getByRole('button', { name: 'Refund sale' }).click();
+  expect(confirmations).toBe(2);
   await expect(page.getByText('Refunded', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: new RegExp(customerName) }).last().click();
-  page.once('dialog', dialog => dialog.accept());
   const permanentDeleteResponse = page.waitForResponse(response => response.url().endsWith(`/api/sales/${storedSale.id}/permanent`) && response.request().method() === 'DELETE');
   await page.getByRole('button', { name: 'Delete receipt' }).click();
+  expect(confirmations).toBe(4);
+  page.off('dialog', acceptConfirmation);
   expect((await permanentDeleteResponse).status()).toBe(204);
   const deletionToken = await page.evaluate(() => sessionStorage.getItem('accessToken')!);
   const deletionHeaders = { Authorization: `Bearer ${deletionToken}` };

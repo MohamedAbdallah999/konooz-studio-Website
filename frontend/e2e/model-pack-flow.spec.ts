@@ -73,8 +73,11 @@ test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation
   await page.getByText(/Snapshot Customer/).last().click();
   await expect(page.locator('.receipt').getByText('E2E-100', { exact: true })).toBeVisible();
   await expect(page.locator('.receipt').getByText(/Black.*3 items per pack/)).toBeVisible();
-  page.once('dialog', dialog => dialog.accept());
+  let confirmations = 0;
+  const acceptConfirmation = async (dialog: import('@playwright/test').Dialog) => { confirmations += 1; await dialog.accept(); };
+  page.on('dialog', acceptConfirmation);
   await page.getByRole('button', { name: 'Refund sale' }).click();
+  expect(confirmations).toBe(2);
   await expect(page.getByText('Refunded', { exact: true })).toBeVisible();
   await page.getByText(/Snapshot Customer/).last().click();
   await expect(page.locator('.receipt').getByText('Refunded', { exact: true })).toBeVisible();
@@ -84,9 +87,10 @@ test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation
     const sales = await (await fetch(`${api}/sales`, { headers })).json();
     return sales.find((sale: { customerName?: string }) => sale.customerName === 'Snapshot Customer').id as string;
   });
-  page.once('dialog', dialog => dialog.accept());
   const permanentDeleteResponse = page.waitForResponse(response => response.url().endsWith(`/api/sales/${refundedSaleId}/permanent`) && response.request().method() === 'DELETE');
   await page.getByRole('button', { name: 'Delete receipt' }).click();
+  expect(confirmations).toBe(4);
+  page.off('dialog', acceptConfirmation);
   expect((await permanentDeleteResponse).status()).toBe(204);
   const deletionToken = await page.evaluate(() => sessionStorage.getItem('accessToken')!);
   const deletionHeaders = { Authorization: `Bearer ${deletionToken}` };

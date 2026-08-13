@@ -19,7 +19,10 @@ const layoutState = {
       packs: [{ id: '00000000-0000-4000-8000-000000000103', modelColourId: '00000000-0000-4000-8000-000000000102', sizesPerPack: 3, stockQuantity: 4, isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced' }],
     }],
   }],
-  sales: [],
+  sales: [{
+    id: '00000000-0000-4000-8000-000000000201', totalAmount: '30.00', depositAmount: '30.00', paidAmount: '30.00', paidAt: layoutTime, discountPercentage: '0.00', customerName: 'Layout Customer', customerPhone: null, shopName: null, customerAddress: null, deletedAt: null, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced',
+    items: [{ id: '00000000-0000-4000-8000-000000000202', saleId: '00000000-0000-4000-8000-000000000201', modelIdAtSale: '00000000-0000-4000-8000-000000000101', modelNumberAtSale: 'LAYOUT-100', modelPriceAtSale: '10.00', colourIdAtSale: '00000000-0000-4000-8000-000000000102', colourNameAtSale: 'Midnight Black', packId: '00000000-0000-4000-8000-000000000103', sizesPerPackAtSale: 3, packPriceAtSale: '30.00', numberOfPacks: 1, lineSubtotal: '30.00', discountAllocation: '0.00', finalLineTotal: '30.00', createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced' }],
+  }],
 };
 
 async function installAuthenticatedState(page: Page) {
@@ -116,6 +119,12 @@ test('compact mobile layout keeps every route and every checkout field usable', 
 
     await page.goto('/sell');
     await expect(page.getByRole('heading', { name: 'Select packs' })).toBeVisible();
+    const saleModelPhoto = page.locator('.sale-model-thumb img').first();
+    await expect(saleModelPhoto).toBeVisible();
+    await expect(saleModelPhoto).toHaveCSS('object-fit', 'contain');
+    const saleModelPhotoBox = await saleModelPhoto.boundingBox();
+    expect(saleModelPhotoBox!.width).toBeLessThanOrEqual(36);
+    expect(saleModelPhotoBox!.height).toBeLessThanOrEqual(36);
     await page.getByRole('button', { name: /LAYOUT-100/ }).click();
     await page.getByRole('button', { name: /Midnight Black/ }).click();
     const packOption = page.getByRole('button', { name: /3 sizes per pack/ });
@@ -138,6 +147,14 @@ test('compact mobile layout keeps every route and every checkout field usable', 
 
     await page.goto('/sales');
     await expect(page.getByRole('heading', { name: 'Sales & reporting' })).toBeVisible();
+    const historyRow = page.locator('.ledger').last().locator('article').first();
+    const historyPhoto = historyRow.getByAltText('Model LAYOUT-100');
+    await expect(historyPhoto).toBeVisible();
+    await expect(historyPhoto).toHaveCSS('object-fit', 'contain');
+    const [rowBox, photoBox] = await Promise.all([historyRow.boundingBox(), historyPhoto.boundingBox()]);
+    expect(rowBox!.height).toBeLessThanOrEqual(68);
+    expect(photoBox!.width).toBeLessThanOrEqual(46);
+    expect(photoBox!.height).toBeLessThanOrEqual(46);
     await expectDocumentContained(page);
   }
 });

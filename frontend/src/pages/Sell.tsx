@@ -10,6 +10,7 @@ import { AnimatedTitle } from '../components/AnimatedTitle';
 import { NumberInput } from '../components/NumberInput';
 import { addMoney, compareMoney, discountedMoney, formatMoney, multiplyMoney, normalizeDecimal, subtractMoney } from '../money';
 import { addPackLine, cartCounts, type CartLine } from '../cart';
+import { confirmDestructiveAction } from '../confirmDestructiveAction';
 
 export function Sell() {
   const [q, setQ] = useState(''), [cart, setCart] = useState<CartLine[]>([]), [receipt, setReceipt] = useState<Sale | null>(null);
@@ -54,9 +55,19 @@ export function Sell() {
   };
 
   const permanentlyDeleteReceipt = async () => {
-    if (!receipt || !confirm(`Permanently delete receipt #${receipt.id.slice(0, 8).toUpperCase()}? It will be refunded first so its pack quantities return to inventory. This cannot be undone.`)) return;
+    if (!receipt || !confirmDestructiveAction(
+      `Permanently delete receipt #${receipt.id.slice(0, 8).toUpperCase()}? It will be refunded first so its pack quantities return to inventory.`,
+      `Final confirmation: permanently erase receipt #${receipt.id.slice(0, 8).toUpperCase()} from the database? This cannot be undone.`,
+    )) return;
     try { await deleteSalePermanently(receipt); setReceipt(null); }
     catch (cause) { alert(cause instanceof Error ? cause.message : 'Unable to delete this receipt.'); }
+  };
+  const removeCartLine = (line: CartLine, index: number) => {
+    if (!confirmDestructiveAction(
+      `Remove ${line.model.modelNumber}, ${line.colour.name} from the current sale?`,
+      `Final confirmation: remove ${line.model.modelNumber}, ${line.colour.name} now?`,
+    )) return;
+    setCart(current => current.filter((_, position) => position !== index));
   };
 
   if (receipt) return <Receipt sale={receipt} onClose={() => setReceipt(null)} onDelete={permanentlyDeleteReceipt}/>;
@@ -65,7 +76,7 @@ export function Sell() {
       <div className="section-head compact"><div><p className="eyebrow">NEW TRANSACTION</p><AnimatedTitle>Select packs</AnimatedTitle><p>Model → colour → pack → number of packs</p></div></div>
       <div className="search"><Search/><input aria-label="Search models and colours" value={q} onChange={event => setQ(event.target.value)} placeholder="Search model or colour..."/></div>
       <div className="selection-flow">
-        <div><span>1 · Model</span><div className="model-options">{results.map(model => <button key={model.id} className={selectedModelId === model.id ? 'selected' : ''} onClick={() => { setSelectedModelId(model.id); setSelectedColourId(''); setSelectedPackId(''); }}><b>{model.modelNumber}</b><small>{formatMoney(model.price)} per size</small></button>)}</div></div>
+        <div><span>1 · Model</span><div className="model-options">{results.map(model => <button key={model.id} className={selectedModelId === model.id ? 'selected' : ''} onClick={() => { setSelectedModelId(model.id); setSelectedColourId(''); setSelectedPackId(''); }}><span className="sale-model-thumb">{model.photoUrl ? <img src={model.photoUrl} alt=""/> : model.modelNumber.slice(0, 2).toUpperCase()}</span><span className="sale-model-copy"><b>{model.modelNumber}</b><small>{formatMoney(model.price)} per size</small></span></button>)}</div></div>
         {selectedModel && <div><span>2 · Colour</span><div className="variant-buttons">{selectedModel.colours.filter(colour => colour.isActive).map(colour => <button key={colour.id} className={selectedColourId === colour.id ? 'selected' : ''} onClick={() => { setSelectedColourId(colour.id); setSelectedPackId(''); }}><span><i className="color-swatch" style={{ backgroundColor: colorSwatch(colour.name) }}/>{colour.name}</span></button>)}</div></div>}
         {selectedColour && <div><span>3 · Pack</span><div className="variant-buttons pack-options">{selectedColour.packs.filter(pack => pack.isActive).map(pack => { const left = packsRemaining(pack); return <button key={pack.id} disabled={!left} className={`${selectedPackId === pack.id ? 'selected ' : ''}${!left ? 'out-of-stock' : ''}`} onClick={() => setSelectedPackId(pack.id)}><span className="pack-option-title">{pack.sizesPerPack} sizes per pack</span><small className="pack-option-price">{formatMoney(multiplyMoney(selectedModel!.price, pack.sizesPerPack))}</small><small className="pack-option-stock">{left} packs left</small></button>; })}</div></div>}
         {selectedPack && <div className="pack-quantity"><span>4 · Number of packs</span><NumberInput inputMode="numeric" min="1" max={packsRemaining(selectedPack)} step="1" value={numberOfPacks} onChange={event => setNumberOfPacks(Math.max(1, Number(event.target.value) || 1))}/><button className="primary" disabled={!packsRemaining(selectedPack)} onClick={addSelected}><Plus/> Add {numberOfPacks} {numberOfPacks === 1 ? 'pack' : 'packs'}</button><small>{selectedPack.sizesPerPack * numberOfPacks} represented sizes · {formatMoney(multiplyMoney(multiplyMoney(selectedModel!.price, selectedPack.sizesPerPack), numberOfPacks))}</small></div>}
@@ -78,7 +89,7 @@ export function Sell() {
         return <motion.article key={line.pack.id} layout initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
           <div><b>{line.model.modelNumber}</b><span><i aria-hidden="true" className="color-swatch" style={{ backgroundColor: colorSwatch(line.colour.name) }}/>{line.colour.name} · {line.pack.sizesPerPack} sizes/pack</span><small>{formatMoney(packPrice)} per pack · {formatMoney(lineTotal)} line total · {line.pack.stockQuantity - line.numberOfPacks} remaining</small></div>
           <div className="quantity"><button aria-label={`Decrease packs for ${line.model.modelNumber}`} onClick={() => setCart(current => current.map((entry, position) => position === index ? { ...entry, numberOfPacks: Math.max(1, entry.numberOfPacks - 1) } : entry))}><Minus/></button><NumberInput className="quantity-input" inputMode="numeric" min="1" max={line.pack.stockQuantity} step="1" value={line.numberOfPacks} aria-label={`Number of packs for ${line.model.modelNumber}, ${line.colour.name}`} onChange={event => setCart(current => current.map((entry, position) => position === index ? { ...entry, numberOfPacks: Math.min(entry.pack.stockQuantity, Math.max(1, Number(event.target.value) || 1)) } : entry))}/><button aria-label={`Increase packs for ${line.model.modelNumber}`} onClick={() => setCart(current => current.map((entry, position) => position === index ? { ...entry, numberOfPacks: Math.min(entry.numberOfPacks + 1, entry.pack.stockQuantity) } : entry))}><Plus/></button></div>
-          <button className="remove" aria-label={`Remove ${line.model.modelNumber}, ${line.colour.name} from sale`} onClick={() => setCart(current => current.filter((_, position) => position !== index))}><X/></button>
+          <button className="remove" aria-label={`Remove ${line.model.modelNumber}, ${line.colour.name} from sale`} onClick={() => removeCartLine(line, index)}><X/></button>
         </motion.article>;
       })}</AnimatePresence></motion.div>}
       <div className="checkout-details client-details">

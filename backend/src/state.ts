@@ -21,18 +21,7 @@ router.get('/', async (req, res) => {
     return;
   }
   const state = await prisma.$transaction(async tx => {
-    const [models, sales, versionRows] = await Promise.all([
-      tx.productModel.findMany({
-        where: { isActive: true },
-        include: {
-          colours: {
-            where: { isActive: true },
-            orderBy: { name: 'asc' },
-            include: { packs: { where: { isActive: true }, orderBy: { sizesPerPack: 'asc' } } },
-          },
-        },
-        orderBy: { updatedAt: 'desc' },
-      }),
+    const [sales, versionRows] = await Promise.all([
       tx.sale.findMany({
         orderBy: { createdAt: 'desc' },
         take: 500,
@@ -40,6 +29,18 @@ router.get('/', async (req, res) => {
       }),
       tx.$queryRaw<Array<{ version: string }>>(versionQuery),
     ]);
+    const receiptModelIds = [...new Set(sales.flatMap(sale => sale.items.map(line => line.modelIdAtSale).filter((id): id is string => Boolean(id))))];
+    const models = await tx.productModel.findMany({
+      where: { OR: [{ isActive: true }, { id: { in: receiptModelIds } }] },
+      include: {
+        colours: {
+          where: { isActive: true },
+          orderBy: { name: 'asc' },
+          include: { packs: { where: { isActive: true }, orderBy: { sizesPerPack: 'asc' } } },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
     return { models, sales, version: versionRows[0]?.version ?? current, serverTime: new Date().toISOString() };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   res.json(state);
