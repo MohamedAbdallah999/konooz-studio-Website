@@ -30,9 +30,13 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
     const token = sessionStorage.getItem('accessToken')!;
     const headers = { Authorization: `Bearer ${token}` };
     const sales = await (await fetch(`${apiUrl}/sales`, { headers })).json();
-    for (const sale of sales.filter((entry: { customerName?: string; deletedAt?: string }) => entry.customerName?.startsWith('Production Smoke ') && !entry.deletedAt)) {
-      const response = await fetch(`${apiUrl}/sales/${sale.id}`, { method: 'DELETE', headers });
-      if (!response.ok) throw new Error(`Could not refund prior smoke receipt ${sale.id}`);
+    for (const sale of sales.filter((entry: { customerName?: string }) => entry.customerName?.startsWith('Production Smoke '))) {
+      if (!sale.deletedAt) {
+        const refund = await fetch(`${apiUrl}/sales/${sale.id}`, { method: 'DELETE', headers });
+        if (!refund.ok) throw new Error(`Could not refund prior smoke receipt ${sale.id}`);
+      }
+      const removal = await fetch(`${apiUrl}/sales/${sale.id}/permanent`, { method: 'DELETE', headers });
+      if (!removal.ok) throw new Error(`Could not remove prior smoke receipt ${sale.id}`);
     }
     const models = await (await fetch(`${apiUrl}/models`, { headers })).json();
     for (const model of models.filter((entry: { modelNumber: string }) => entry.modelNumber.startsWith('PROD-SMOKE-'))) {
@@ -185,8 +189,9 @@ test('production checkout combines multiple models and multiple colours', async 
   await page.evaluate(async apiUrl => {
     const token = sessionStorage.getItem('accessToken')!, headers = { Authorization: `Bearer ${token}` };
     const sales = await (await fetch(`${apiUrl}/sales`, { headers })).json();
-    for (const sale of sales.filter((entry: { customerName?: string; deletedAt?: string }) => entry.customerName?.startsWith('Production Multi Smoke ') && !entry.deletedAt)) {
-      await fetch(`${apiUrl}/sales/${sale.id}`, { method: 'DELETE', headers });
+    for (const sale of sales.filter((entry: { customerName?: string }) => entry.customerName?.startsWith('Production Multi Smoke '))) {
+      if (!sale.deletedAt) await fetch(`${apiUrl}/sales/${sale.id}`, { method: 'DELETE', headers });
+      await fetch(`${apiUrl}/sales/${sale.id}/permanent`, { method: 'DELETE', headers });
     }
     const models = await (await fetch(`${apiUrl}/models`, { headers })).json();
     for (const model of models.filter((entry: { modelNumber: string }) => entry.modelNumber.startsWith('PROD-MULTI-'))) {
@@ -250,7 +255,10 @@ test('production checkout combines multiple models and multiple colours', async 
       const token = sessionStorage.getItem('accessToken');
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      if (createdSaleId) await fetch(`${apiUrl}/sales/${createdSaleId}`, { method: 'DELETE', headers });
+      if (createdSaleId) {
+        await fetch(`${apiUrl}/sales/${createdSaleId}`, { method: 'DELETE', headers });
+        await fetch(`${apiUrl}/sales/${createdSaleId}/permanent`, { method: 'DELETE', headers });
+      }
       for (const modelId of createdModelIds) await fetch(`${apiUrl}/models/${modelId}`, { method: 'DELETE', headers });
     }, { apiUrl: api, createdSaleId: saleId, createdModelIds: modelIds });
   }
