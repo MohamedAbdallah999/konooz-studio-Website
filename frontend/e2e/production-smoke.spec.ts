@@ -78,15 +78,25 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await page.getByLabel('Discount percentage').fill('12.50');
   await expect(page.getByText(/30\.03 EGP per pack.*60\.06 EGP line total.*3 remaining/)).toBeVisible();
   await page.getByRole('button', { name: 'Complete sale' }).click();
-  await expect(page.locator('.receipt').getByText(modelNumber, { exact: true })).toBeVisible();
-  await expect(page.locator('.receipt').getByText(/Black.*3 items per pack/)).toBeVisible();
-  const receiptLine = page.locator('.receipt-item-table tbody tr').first();
+  const receipt = page.locator('.receipt');
+  await expect(receipt.getByText(modelNumber, { exact: true })).toBeVisible();
+  await expect(receipt.getByText(/Black.*3 items per pack/)).toBeVisible();
+  const receiptLine = receipt.locator('.receipt-item-table tbody tr').first();
   await expect(receiptLine.getByText('10.01', { exact: true })).toBeVisible();
   await expect(receiptLine.getByText('30.03', { exact: true })).toBeVisible();
   await expect(receiptLine.getByText('60.06', { exact: true })).toBeVisible();
   await expect(receiptLine.getByText(/7\.51 EGP/)).toHaveCount(0);
-  await expect(page.locator('.receipt-summary').getByText('− 7.51 EGP', { exact: true })).toBeVisible();
-  await expect(page.locator('.receipt-summary').getByText('52.55 EGP', { exact: true })).toBeVisible();
+  await expect(receipt.locator('.receipt-summary').getByText('− 7.51 EGP', { exact: true })).toBeVisible();
+  await expect(receipt.locator('.receipt-summary').getByText('52.55 EGP', { exact: true })).toBeVisible();
+
+  const storedSale = await page.evaluate(async apiUrl => {
+    const token = sessionStorage.getItem('accessToken')!;
+    const headers = { Authorization: `Bearer ${token}` };
+    const sales = await (await fetch(`${apiUrl}/sales`, { headers })).json();
+    return sales.find((entry: { customerName?: string }) => entry.customerName === document.querySelector('.receipt-overview div:nth-child(3) b')?.textContent);
+  }, api);
+  expect(storedSale.items[0]).toMatchObject({ lineSubtotal: '60.06', finalLineTotal: '60.06' });
+  expect(Number(storedSale.items[0].discountAllocation)).toBe(0);
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download PDF' }).click();
@@ -196,7 +206,11 @@ test('production checkout combines multiple models and multiple colours', async 
     await page.getByRole('button', { name: 'Complete sale' }).click();
     const response = await responsePromise;
     expect(response.status()).toBe(201);
-    saleId = (await response.json()).id;
+    const createdSale = await response.json();
+    saleId = createdSale.id;
+    expect(createdSale.totalAmount).toBe('76');
+    expect(createdSale.items).toHaveLength(3);
+    expect(createdSale.items.every((line: { lineSubtotal: string; discountAllocation: string; finalLineTotal: string }) => Number(line.discountAllocation) === 0 && line.finalLineTotal === line.lineSubtotal)).toBe(true);
 
     const receipt = page.locator('.receipt');
     await expect(receipt.locator('.receipt-item-table tbody tr')).toHaveCount(3);

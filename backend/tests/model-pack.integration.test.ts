@@ -74,7 +74,7 @@ suite('model → colour → pack API', () => {
     const colour = created.colours[0], pack = colour.packs[0];
     const sold = (await request(app).post('/api/sales').set(auth()).send({ discountPercentage: '12.50', depositAmount: '10.00', items: [{ modelId: created.id, colourId: colour.id, packId: pack.id, numberOfPacks: 2 }] }).expect(201)).body;
     expect(sold.totalAmount).toBe('52.55');
-    expect(sold.items[0]).toMatchObject({ modelNumberAtSale: 'DECIMAL', modelPriceAtSale: '10.01', colourNameAtSale: 'Black', sizesPerPackAtSale: 3, packPriceAtSale: '30.03', numberOfPacks: 2, lineSubtotal: '60.06', discountAllocation: '0.00', finalLineTotal: '60.06' });
+    expect(sold.items[0]).toMatchObject({ modelNumberAtSale: 'DECIMAL', modelPriceAtSale: '10.01', colourNameAtSale: 'Black', sizesPerPackAtSale: 3, packPriceAtSale: '30.03', numberOfPacks: 2, lineSubtotal: '60.06', discountAllocation: '0', finalLineTotal: '60.06' });
     expect((await prisma.pack.findUniqueOrThrow({ where: { id: pack.id } })).stockQuantity).toBe(3);
 
     const current = await prisma.productModel.findUniqueOrThrow({ where: { id: created.id }, include: { colours: { include: { packs: true } } } });
@@ -155,7 +155,7 @@ suite('model → colour → pack API', () => {
     const maxModel = (await request(app).post('/api/models').set(auth()).send(modelBody('MAX-DISCOUNT', '0.01', 5)).expect(201)).body;
     const maxPack = maxModel.colours[0].packs[0];
     const maximum = (await request(app).post('/api/sales').set(auth()).send({ discountPercentage: '100.00', items: [{ modelId: maxModel.id, colourId: maxModel.colours[0].id, packId: maxPack.id, numberOfPacks: 2 }] }).expect(201)).body;
-    expect(maximum.items[0]).toMatchObject({ lineSubtotal: '0.06', discountAllocation: '0.00', finalLineTotal: '0.06' });
+    expect(maximum.items[0]).toMatchObject({ lineSubtotal: '0.06', discountAllocation: '0', finalLineTotal: '0.06' });
     expect(new Prisma.Decimal(maximum.totalAmount).eq(0)).toBe(true);
     for (const discountPercentage of ['100.01', '-1', 'not-a-number']) {
       await request(app).post('/api/sales').set(auth()).send({ discountPercentage, items: [{ modelId: maxModel.id, colourId: maxModel.colours[0].id, packId: maxPack.id, numberOfPacks: 1 }] }).expect(422);
