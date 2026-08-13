@@ -13,7 +13,7 @@ test.beforeAll(async () => {
 
 test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation', async ({ page }) => {
   await page.goto('/login');
-  await page.getByLabel('Email or username').fill('e2e-admin');
+  await page.getByLabel('Username').fill('e2e-admin');
   await page.getByLabel('Password').fill('e2e-password-strong');
   await page.getByRole('button', { name: 'Enter Konooz' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:4173/');

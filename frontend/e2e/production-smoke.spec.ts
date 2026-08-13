@@ -19,7 +19,7 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   const customerName = `Production Smoke ${suffix}`;
 
   await page.goto('/login');
-  await page.getByLabel('Email or username').fill(username!);
+  await page.getByLabel('Username').fill(username!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: 'Enter Konooz' }).click();
   await expect(page).toHaveURL('https://konooz-studio.pages.dev/');

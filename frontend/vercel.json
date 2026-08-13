@@ -16,6 +16,18 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://konooz-studio.pages.dev",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "destination": "https://konooz-studio.pages.dev/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
