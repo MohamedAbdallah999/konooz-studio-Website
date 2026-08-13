@@ -32,7 +32,13 @@ test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation
   await page.getByRole('button', { name: /E2E-100/ }).click();
   await page.getByRole('button', { name: /Black/ }).click();
   await page.getByRole('button', { name: /3 sizes per pack/ }).click();
-  await page.locator('.pack-quantity input').fill('2');
+  const packQuantity = page.locator('.pack-quantity input');
+  await packQuantity.click();
+  await packQuantity.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await packQuantity.press('Backspace');
+  await expect(packQuantity).toHaveValue('');
+  await packQuantity.pressSequentially('2');
+  await expect(packQuantity).toHaveValue('2');
   await page.getByRole('button', { name: 'Add 2 packs' }).click();
   await page.getByLabel('Client name').fill('Snapshot Customer');
   await page.getByLabel('Discount percentage').fill('12.50');
