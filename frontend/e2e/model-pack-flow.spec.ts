@@ -85,7 +85,9 @@ test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation
     return sales.find((sale: { customerName?: string }) => sale.customerName === 'Snapshot Customer').id as string;
   });
   page.once('dialog', dialog => dialog.accept());
+  const permanentDeleteResponse = page.waitForResponse(response => response.url().endsWith(`/api/sales/${refundedSaleId}/permanent`) && response.request().method() === 'DELETE');
   await page.getByRole('button', { name: 'Delete receipt' }).click();
+  expect((await permanentDeleteResponse).status()).toBe(204);
   const deletionToken = await page.evaluate(() => sessionStorage.getItem('accessToken')!);
   const deletionHeaders = { Authorization: `Bearer ${deletionToken}` };
   const deletedRead = await page.request.get(`http://127.0.0.1:4010/api/sales/${refundedSaleId}`, { headers: deletionHeaders });

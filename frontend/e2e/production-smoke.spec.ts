@@ -141,7 +141,9 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await expect(page.getByText('Refunded', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: new RegExp(customerName) }).last().click();
   page.once('dialog', dialog => dialog.accept());
+  const permanentDeleteResponse = page.waitForResponse(response => response.url().endsWith(`/api/sales/${storedSale.id}/permanent`) && response.request().method() === 'DELETE');
   await page.getByRole('button', { name: 'Delete receipt' }).click();
+  expect((await permanentDeleteResponse).status()).toBe(204);
   const deletionToken = await page.evaluate(() => sessionStorage.getItem('accessToken')!);
   const deletionHeaders = { Authorization: `Bearer ${deletionToken}` };
   const deletedRead = await page.request.get(`${api}/sales/${storedSale.id}`, { headers: deletionHeaders });
