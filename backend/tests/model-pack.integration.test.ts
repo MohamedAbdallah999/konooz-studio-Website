@@ -74,7 +74,7 @@ suite('model → colour → pack API', () => {
     const colour = created.colours[0], pack = colour.packs[0];
     const sold = (await request(app).post('/api/sales').set(auth()).send({ discountPercentage: '12.50', depositAmount: '10.00', items: [{ modelId: created.id, colourId: colour.id, packId: pack.id, numberOfPacks: 2 }] }).expect(201)).body;
     expect(sold.totalAmount).toBe('52.55');
-    expect(sold.items[0]).toMatchObject({ modelNumberAtSale: 'DECIMAL', modelPriceAtSale: '10.01', colourNameAtSale: 'Black', sizesPerPackAtSale: 3, packPriceAtSale: '30.03', numberOfPacks: 2, lineSubtotal: '60.06', discountAllocation: '7.51', finalLineTotal: '52.55' });
+    expect(sold.items[0]).toMatchObject({ modelNumberAtSale: 'DECIMAL', modelPriceAtSale: '10.01', colourNameAtSale: 'Black', sizesPerPackAtSale: 3, packPriceAtSale: '30.03', numberOfPacks: 2, lineSubtotal: '60.06', discountAllocation: '0.00', finalLineTotal: '60.06' });
     expect((await prisma.pack.findUniqueOrThrow({ where: { id: pack.id } })).stockQuantity).toBe(3);
 
     const current = await prisma.productModel.findUniqueOrThrow({ where: { id: created.id }, include: { colours: { include: { packs: true } } } });
@@ -118,8 +118,7 @@ suite('model → colour → pack API', () => {
     expect(sold.items.map((line: { lineSubtotal: string }) => line.lineSubtotal)).toEqual(['60.06', '20.02', '49.95']);
     expect(new Set(sold.items.map((line: { modelIdAtSale: string }) => line.modelIdAtSale)).size).toBe(2);
     expect(new Set(sold.items.map((line: { colourIdAtSale: string }) => line.colourIdAtSale)).size).toBe(3);
-    expect(sold.items.reduce((sum: Prisma.Decimal, line: { discountAllocation: string }) => sum.add(line.discountAllocation), new Prisma.Decimal(0)).toFixed(2)).toBe('9.75');
-    expect(sold.items.every((line: { lineSubtotal: string; discountAllocation: string; finalLineTotal: string }) => new Prisma.Decimal(line.lineSubtotal).sub(line.discountAllocation).eq(line.finalLineTotal))).toBe(true);
+    expect(sold.items.every((line: { lineSubtotal: string; discountAllocation: string; finalLineTotal: string }) => new Prisma.Decimal(line.discountAllocation).eq(0) && new Prisma.Decimal(line.lineSubtotal).eq(line.finalLineTotal))).toBe(true);
     expect(sold.totalAmount).toBe('120.28');
     expect((await prisma.pack.findUniqueOrThrow({ where: { id: first.colours[0].packs[0].id } })).stockQuantity).toBe(3);
     expect((await prisma.pack.findUniqueOrThrow({ where: { id: first.colours[1].packs[0].id } })).stockQuantity).toBe(4);
@@ -156,8 +155,7 @@ suite('model → colour → pack API', () => {
     const maxModel = (await request(app).post('/api/models').set(auth()).send(modelBody('MAX-DISCOUNT', '0.01', 5)).expect(201)).body;
     const maxPack = maxModel.colours[0].packs[0];
     const maximum = (await request(app).post('/api/sales').set(auth()).send({ discountPercentage: '100.00', items: [{ modelId: maxModel.id, colourId: maxModel.colours[0].id, packId: maxPack.id, numberOfPacks: 2 }] }).expect(201)).body;
-    expect(maximum.items[0]).toMatchObject({ lineSubtotal: '0.06', discountAllocation: '0.06' });
-    expect(new Prisma.Decimal(maximum.items[0].finalLineTotal).eq(0)).toBe(true);
+    expect(maximum.items[0]).toMatchObject({ lineSubtotal: '0.06', discountAllocation: '0.00', finalLineTotal: '0.06' });
     expect(new Prisma.Decimal(maximum.totalAmount).eq(0)).toBe(true);
     for (const discountPercentage of ['100.01', '-1', 'not-a-number']) {
       await request(app).post('/api/sales').set(auth()).send({ discountPercentage, items: [{ modelId: maxModel.id, colourId: maxModel.colours[0].id, packId: maxPack.id, numberOfPacks: 1 }] }).expect(422);

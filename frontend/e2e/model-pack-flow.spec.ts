@@ -41,12 +41,13 @@ test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation
   const receipt = page.locator('.receipt');
   await expect(receipt.getByText('E2E-100', { exact: true })).toBeVisible();
   await expect(receipt.getByText(/Black.*3 items per pack/)).toBeVisible();
-  const receiptLine = receipt.locator('.receipt-lines article').first();
-  await expect(receiptLine.getByText('Line total')).toBeVisible();
-  await expect(receiptLine.getByText('60.06 EGP', { exact: true })).toBeVisible();
-  await expect(receiptLine.getByText('− 7.51 EGP', { exact: true })).toBeVisible();
-  await expect(receiptLine.getByText('Final line amount')).toBeVisible();
-  await expect(receiptLine.getByText('52.55 EGP', { exact: true })).toBeVisible();
+  const receiptLine = receipt.locator('.receipt-item-table tbody tr').first();
+  await expect(receiptLine.getByText('10.01', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText('30.03', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText('60.06', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText(/7\.51 EGP/)).toHaveCount(0);
+  await expect(receipt.locator('.receipt-summary').getByText('− 7.51 EGP', { exact: true })).toBeVisible();
+  await expect(receipt.locator('.receipt-summary').getByText('52.55 EGP', { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download PDF' }).click();
@@ -137,7 +138,7 @@ test('completes one sale with multiple models and multiple colours', async ({ pa
     saleId = (await response.json()).id;
 
     const receipt = page.locator('.receipt');
-    await expect(receipt.locator('.receipt-lines article')).toHaveCount(3);
+    await expect(receipt.locator('.receipt-item-table tbody tr')).toHaveCount(3);
     await expect(receipt.getByText(firstModelNumber, { exact: true }).first()).toBeVisible();
     await expect(receipt.getByText(secondModelNumber, { exact: true })).toBeVisible();
     await expect(receipt.getByText(/Black.*2 items per pack/)).toBeVisible();

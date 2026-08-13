@@ -80,10 +80,13 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await page.getByRole('button', { name: 'Complete sale' }).click();
   await expect(page.locator('.receipt').getByText(modelNumber, { exact: true })).toBeVisible();
   await expect(page.locator('.receipt').getByText(/Black.*3 items per pack/)).toBeVisible();
-  const receiptLine = page.locator('.receipt-lines article').first();
-  await expect(receiptLine.getByText('60.06 EGP', { exact: true })).toBeVisible();
-  await expect(receiptLine.getByText('− 7.51 EGP', { exact: true })).toBeVisible();
-  await expect(receiptLine.getByText('52.55 EGP', { exact: true })).toBeVisible();
+  const receiptLine = page.locator('.receipt-item-table tbody tr').first();
+  await expect(receiptLine.getByText('10.01', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText('30.03', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText('60.06', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText(/7\.51 EGP/)).toHaveCount(0);
+  await expect(page.locator('.receipt-summary').getByText('− 7.51 EGP', { exact: true })).toBeVisible();
+  await expect(page.locator('.receipt-summary').getByText('52.55 EGP', { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download PDF' }).click();
@@ -196,7 +199,7 @@ test('production checkout combines multiple models and multiple colours', async 
     saleId = (await response.json()).id;
 
     const receipt = page.locator('.receipt');
-    await expect(receipt.locator('.receipt-lines article')).toHaveCount(3);
+    await expect(receipt.locator('.receipt-item-table tbody tr')).toHaveCount(3);
     await expect(receipt.getByText(/Black.*2 items per pack/)).toBeVisible();
     await expect(receipt.getByText(/Gold.*3 items per pack/)).toBeVisible();
     await expect(receipt.getByText(/Blue.*4 items per pack/)).toBeVisible();

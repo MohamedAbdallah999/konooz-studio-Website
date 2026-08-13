@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from './db.js';
 import { validate } from './middleware.js';
+import { orderDiscountTotals, roundMoney } from './saleTotals.js';
 
 const router = Router();
 const MAX_PACKS_PER_LINE = 1_000;
@@ -35,9 +36,6 @@ const sale = z.object({
     packIds.add(line.packId);
   });
 });
-
-const roundMoney = (value: Prisma.Decimal) => value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-const smallerDecimal = (left: Prisma.Decimal, right: Prisma.Decimal) => left.lte(right) ? left : right;
 
 router.get('/', async (_req, res) => {
   const data = await prisma.sale.findMany({
@@ -132,20 +130,14 @@ router.post('/', validate(sale), async (req, res) => {
       });
     }
 
-    const subtotal = calculated.reduce((sum, entry) => sum.add(entry.lineSubtotal), new Prisma.Decimal(0));
-    const discountTotal = roundMoney(subtotal.mul(body.discountPercentage).div(100));
-    let remainingDiscount = discountTotal;
-    const snapshots = calculated.map((entry, index) => {
-      const proportionalAllocation = subtotal.isZero()
-        ? new Prisma.Decimal(0)
-        : roundMoney(entry.lineSubtotal.div(subtotal).mul(discountTotal));
-      const allocation = index === calculated.length - 1
-        ? remainingDiscount
-        : smallerDecimal(remainingDiscount, proportionalAllocation);
-      remainingDiscount = remainingDiscount.sub(allocation);
-      return { ...entry, discountAllocation: allocation, finalLineTotal: entry.lineSubtotal.sub(allocation) };
-    });
-    const totalAmount = snapshots.reduce((sum, entry) => sum.add(entry.finalLineTotal), new Prisma.Decimal(0));
+    const { total: totalAmount } = orderDiscountTotals(calculated.map(entry => entry.lineSubtotal), body.discountPercentage);
+    // Discount belongs to the sale as a whole. The legacy snapshot columns stay
+    // populated with undiscounted line values for backwards-compatible reads.
+    const snapshots = calculated.map(entry => ({
+      ...entry,
+      discountAllocation: new Prisma.Decimal(0),
+      finalLineTotal: entry.lineSubtotal,
+    }));
     const paidAmount = body.depositAmount ?? totalAmount;
     if (paidAmount.gt(totalAmount)) throw Object.assign(new Error('Deposit cannot be greater than the receipt total.'), { status: 400 });
 

@@ -1,5 +1,5 @@
 import type { Sale, SaleLine } from './types';
-import { addMoney, compareMoney, multiplyMoney, normalizeDecimal, subtractMoney } from './money';
+import { addMoney, compareMoney, discountedMoney, multiplyMoney, normalizeDecimal } from './money';
 
 export type ReceiptLineFacts = {
   legacy: boolean;
@@ -11,8 +11,6 @@ export type ReceiptLineFacts = {
   packPrice: string;
   numberOfPacks: number;
   subtotal: string;
-  discount: string;
-  total: string;
   mathematicallyConsistent: boolean;
 };
 
@@ -27,8 +25,6 @@ export const receiptLineFacts = (line: SaleLine): ReceiptLineFacts => {
   const packPrice = normalizeDecimal(line.packPriceAtSale ?? unitPrice);
   const numberOfPacks = line.numberOfPacks ?? legacyQuantity;
   const subtotal = normalizeDecimal(line.lineSubtotal ?? multiplyMoney(packPrice, numberOfPacks));
-  const discount = normalizeDecimal(line.discountAllocation ?? 0);
-  const total = normalizeDecimal(line.finalLineTotal ?? subtractMoney(subtotal, discount));
   return {
     legacy,
     modelNumber: line.modelNumberAtSale ?? line.legacyModelNumberAtSale ?? line.itemVariant?.item?.modelNumber ?? 'Legacy model',
@@ -39,26 +35,20 @@ export const receiptLineFacts = (line: SaleLine): ReceiptLineFacts => {
     packPrice,
     numberOfPacks,
     subtotal,
-    discount,
-    total,
     mathematicallyConsistent: compareMoney(packPrice, multiplyMoney(unitPrice, sizesPerPack)) === 0n
-      && compareMoney(subtotal, multiplyMoney(packPrice, numberOfPacks)) === 0n
-      && compareMoney(total, subtractMoney(subtotal, discount)) === 0n,
+      && compareMoney(subtotal, multiplyMoney(packPrice, numberOfPacks)) === 0n,
   };
 };
 
 export const receiptSummary = (sale: Sale) => {
   const lines = sale.items.map(receiptLineFacts);
   const subtotal = lines.reduce((sum, line) => addMoney(sum, line.subtotal), '0.00');
-  const discount = lines.reduce((sum, line) => addMoney(sum, line.discount), '0.00');
-  const finalLines = lines.reduce((sum, line) => addMoney(sum, line.total), '0.00');
+  const totals = discountedMoney(subtotal, sale.discountPercentage);
   return {
     lines,
     subtotal,
-    discount,
-    finalLines,
+    discount: totals.discount,
     mathematicallyConsistent: lines.every(line => line.mathematicallyConsistent)
-      && compareMoney(subtractMoney(subtotal, discount), finalLines) === 0n
-      && compareMoney(finalLines, sale.totalAmount) === 0n,
+      && compareMoney(totals.total, sale.totalAmount) === 0n,
   };
 };
