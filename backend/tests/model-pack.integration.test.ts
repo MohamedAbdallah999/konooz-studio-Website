@@ -98,20 +98,32 @@ suite('model → colour → pack API', () => {
     expect((await prisma.pack.findUniqueOrThrow({ where: { id: line.packId } })).stockQuantity).toBe(0);
   });
 
-  it('allocates a multi-line discount while preserving original line totals', async () => {
-    const first = (await request(app).post('/api/models').set(auth()).send(modelBody('MULTI-A', '10.01', 5)).expect(201)).body;
+  it('completes a discounted sale across multiple models and multiple colours', async () => {
+    const first = (await request(app).post('/api/models').set(auth()).send({
+      ...modelBody('MULTI-A', '10.01', 5),
+      colours: [
+        { name: 'Black', isActive: true, packs: [{ sizesPerPack: 3, stockQuantity: 5, isActive: true }] },
+        { name: 'Gold', isActive: true, packs: [{ sizesPerPack: 2, stockQuantity: 5, isActive: true }] },
+      ],
+    }).expect(201)).body;
     const second = (await request(app).post('/api/models').set(auth()).send(modelBody('MULTI-B', '5.55', 5)).expect(201)).body;
     const sold = (await request(app).post('/api/sales').set(auth()).send({
       discountPercentage: '7.50',
       items: [
         { modelId: first.id, colourId: first.colours[0].id, packId: first.colours[0].packs[0].id, numberOfPacks: 2 },
+        { modelId: first.id, colourId: first.colours[1].id, packId: first.colours[1].packs[0].id, numberOfPacks: 1 },
         { modelId: second.id, colourId: second.colours[0].id, packId: second.colours[0].packs[0].id, numberOfPacks: 3 },
       ],
     }).expect(201)).body;
-    expect(sold.items.map((line: { lineSubtotal: string }) => line.lineSubtotal)).toEqual(['60.06', '49.95']);
-    expect(sold.items.reduce((sum: Prisma.Decimal, line: { discountAllocation: string }) => sum.add(line.discountAllocation), new Prisma.Decimal(0)).toFixed(2)).toBe('8.25');
+    expect(sold.items.map((line: { lineSubtotal: string }) => line.lineSubtotal)).toEqual(['60.06', '20.02', '49.95']);
+    expect(new Set(sold.items.map((line: { modelIdAtSale: string }) => line.modelIdAtSale)).size).toBe(2);
+    expect(new Set(sold.items.map((line: { colourIdAtSale: string }) => line.colourIdAtSale)).size).toBe(3);
+    expect(sold.items.reduce((sum: Prisma.Decimal, line: { discountAllocation: string }) => sum.add(line.discountAllocation), new Prisma.Decimal(0)).toFixed(2)).toBe('9.75');
     expect(sold.items.every((line: { lineSubtotal: string; discountAllocation: string; finalLineTotal: string }) => new Prisma.Decimal(line.lineSubtotal).sub(line.discountAllocation).eq(line.finalLineTotal))).toBe(true);
-    expect(sold.totalAmount).toBe('101.76');
+    expect(sold.totalAmount).toBe('120.28');
+    expect((await prisma.pack.findUniqueOrThrow({ where: { id: first.colours[0].packs[0].id } })).stockQuantity).toBe(3);
+    expect((await prisma.pack.findUniqueOrThrow({ where: { id: first.colours[1].packs[0].id } })).stockQuantity).toBe(4);
+    expect((await prisma.pack.findUniqueOrThrow({ where: { id: second.colours[0].packs[0].id } })).stockQuantity).toBe(2);
   });
 
   it('enforces exact CORS origins and database-backed login throttling', async () => {

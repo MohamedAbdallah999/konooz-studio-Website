@@ -87,3 +87,71 @@ test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation
   await page.setViewportSize({ width: 1440, height: 900 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test('completes one sale with multiple models and multiple colours', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByLabel('Username').fill('e2e-admin');
+  await page.getByLabel('Password').fill('e2e-password-strong');
+  await page.getByRole('button', { name: 'Enter Konooz' }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:4173/');
+
+  const suffix = Date.now().toString(36).toUpperCase();
+  const firstModelNumber = `E2E-MULTI-A-${suffix}`, secondModelNumber = `E2E-MULTI-B-${suffix}`;
+  const modelIds = await page.evaluate(async ({ first, second }) => {
+    const api = 'http://127.0.0.1:4010/api', token = sessionStorage.getItem('accessToken')!;
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const create = async (body: object) => {
+      const response = await fetch(`${api}/models`, { method: 'POST', headers, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    };
+    const firstModel = await create({ modelNumber: first, price: '10.00', photoUrl: null, material: 'E2E', isActive: true, colours: [
+      { name: 'Black', isActive: true, packs: [{ sizesPerPack: 2, stockQuantity: 3, isActive: true }] },
+      { name: 'Gold', isActive: true, packs: [{ sizesPerPack: 3, stockQuantity: 3, isActive: true }] },
+    ] });
+    const secondModel = await create({ modelNumber: second, price: '7.50', photoUrl: null, material: 'E2E', isActive: true, colours: [
+      { name: 'Blue', isActive: true, packs: [{ sizesPerPack: 4, stockQuantity: 3, isActive: true }] },
+    ] });
+    return [firstModel.id, secondModel.id];
+  }, { first: firstModelNumber, second: secondModelNumber });
+
+  let saleId: string | undefined;
+  try {
+    await page.goto('/sell');
+    const addLine = async (modelNumber: string, colour: string, sizesPerPack: number) => {
+      await page.locator('.model-options').getByRole('button', { name: new RegExp(modelNumber) }).click();
+      await page.getByRole('button', { name: new RegExp(`^${colour}`) }).click();
+      await page.getByRole('button', { name: new RegExp(`${sizesPerPack} sizes per pack`) }).click();
+      await page.getByRole('button', { name: 'Add 1 pack' }).click();
+    };
+    await addLine(firstModelNumber, 'Black', 2);
+    await addLine(firstModelNumber, 'Gold', 3);
+    await addLine(secondModelNumber, 'Blue', 4);
+    await expect(page.locator('.basket-lines article')).toHaveCount(3);
+    await page.getByLabel('Client name').fill(`Multi-line customer ${suffix}`);
+    await page.getByLabel('Discount percentage').fill('5.00');
+    const responsePromise = page.waitForResponse(response => response.url().endsWith('/api/sales') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Complete sale' }).click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(201);
+    saleId = (await response.json()).id;
+
+    const receipt = page.locator('.receipt');
+    await expect(receipt.locator('.receipt-lines article')).toHaveCount(3);
+    await expect(receipt.getByText(firstModelNumber, { exact: true }).first()).toBeVisible();
+    await expect(receipt.getByText(secondModelNumber, { exact: true })).toBeVisible();
+    await expect(receipt.getByText(/Black.*2 items per pack/)).toBeVisible();
+    await expect(receipt.getByText(/Gold.*3 items per pack/)).toBeVisible();
+    await expect(receipt.getByText(/Blue.*4 items per pack/)).toBeVisible();
+    await expect(receipt.locator('.receipt-summary').getByText('76.00 EGP', { exact: true })).toBeVisible();
+    await expect(receipt.getByText('Packs / legacy pieces / represented items')).toHaveCount(0);
+  } finally {
+    await page.evaluate(async ({ createdSaleId, createdModelIds }) => {
+      const api = 'http://127.0.0.1:4010/api', token = sessionStorage.getItem('accessToken');
+      if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
+      if (createdSaleId) await fetch(`${api}/sales/${createdSaleId}`, { method: 'DELETE', headers });
+      for (const modelId of createdModelIds) await fetch(`${api}/models/${modelId}`, { method: 'DELETE', headers });
+    }, { createdSaleId: saleId, createdModelIds: modelIds });
+  }
+});

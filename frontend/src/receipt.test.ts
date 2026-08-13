@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type { Sale } from './types';
 import { receiptSummary } from './receipt';
+import { Receipt } from './pages/Receipt';
 
 const sale = (overrides: Partial<Sale> = {}): Sale => ({
   id: crypto.randomUUID(), totalAmount: '180.00', depositAmount: '180.00', paidAmount: '180.00',
@@ -22,5 +25,13 @@ describe('receipt snapshots', () => {
 
   it('detects a receipt whose stored final total disagrees with its immutable lines', () => {
     expect(receiptSummary(sale({ totalAmount: '179.99' })).mathematicallyConsistent).toBe(false);
+  });
+
+  it('organizes receipt details without the internal inventory-count summary', () => {
+    const markup = renderToStaticMarkup(createElement(Receipt, { sale: sale({ customerName: 'Client', customerPhone: '01000000000' }), onClose: () => undefined }));
+    expect(markup).toContain('Receipt number');
+    expect(markup).toContain('Purchase details');
+    expect(markup).toContain('Totals and payment');
+    expect(markup).not.toContain('Packs / legacy pieces / represented items');
   });
 });

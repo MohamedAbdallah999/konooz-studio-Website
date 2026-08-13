@@ -135,3 +135,80 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+test('production checkout combines multiple models and multiple colours', async ({ page }) => {
+  const suffix = Date.now().toString(36).toUpperCase();
+  const firstModelNumber = `PROD-MULTI-A-${suffix}`, secondModelNumber = `PROD-MULTI-B-${suffix}`;
+  await page.goto('/login');
+  await page.getByLabel('Username').fill(username!);
+  await page.getByLabel('Password').fill(password!);
+  await page.getByRole('button', { name: 'Enter Konooz' }).click();
+  await expect(page).toHaveURL('https://konooz-studio.pages.dev/');
+
+  await page.evaluate(async apiUrl => {
+    const token = sessionStorage.getItem('accessToken')!, headers = { Authorization: `Bearer ${token}` };
+    const sales = await (await fetch(`${apiUrl}/sales`, { headers })).json();
+    for (const sale of sales.filter((entry: { customerName?: string; deletedAt?: string }) => entry.customerName?.startsWith('Production Multi Smoke ') && !entry.deletedAt)) {
+      await fetch(`${apiUrl}/sales/${sale.id}`, { method: 'DELETE', headers });
+    }
+    const models = await (await fetch(`${apiUrl}/models`, { headers })).json();
+    for (const model of models.filter((entry: { modelNumber: string }) => entry.modelNumber.startsWith('PROD-MULTI-'))) {
+      await fetch(`${apiUrl}/models/${model.id}`, { method: 'DELETE', headers });
+    }
+  }, api);
+
+  const modelIds = await page.evaluate(async ({ apiUrl, first, second }) => {
+    const token = sessionStorage.getItem('accessToken')!, headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const create = async (body: object) => {
+      const response = await fetch(`${apiUrl}/models`, { method: 'POST', headers, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    };
+    const firstModel = await create({ modelNumber: first, price: '10.00', photoUrl: null, material: 'Production smoke', isActive: true, colours: [
+      { name: 'Black', isActive: true, packs: [{ sizesPerPack: 2, stockQuantity: 3, isActive: true }] },
+      { name: 'Gold', isActive: true, packs: [{ sizesPerPack: 3, stockQuantity: 3, isActive: true }] },
+    ] });
+    const secondModel = await create({ modelNumber: second, price: '7.50', photoUrl: null, material: 'Production smoke', isActive: true, colours: [
+      { name: 'Blue', isActive: true, packs: [{ sizesPerPack: 4, stockQuantity: 3, isActive: true }] },
+    ] });
+    return [firstModel.id, secondModel.id];
+  }, { apiUrl: api, first: firstModelNumber, second: secondModelNumber });
+
+  let saleId: string | undefined;
+  try {
+    await page.goto('/sell');
+    const addLine = async (modelNumber: string, colour: string, sizesPerPack: number) => {
+      await page.locator('.model-options').getByRole('button', { name: new RegExp(modelNumber) }).click();
+      await page.getByRole('button', { name: new RegExp(`^${colour}`) }).click();
+      await page.getByRole('button', { name: new RegExp(`${sizesPerPack} sizes per pack`) }).click();
+      await page.getByRole('button', { name: 'Add 1 pack' }).click();
+    };
+    await addLine(firstModelNumber, 'Black', 2);
+    await addLine(firstModelNumber, 'Gold', 3);
+    await addLine(secondModelNumber, 'Blue', 4);
+    await expect(page.locator('.basket-lines article')).toHaveCount(3);
+    await page.getByLabel('Client name').fill(`Production Multi Smoke ${suffix}`);
+    await page.getByLabel('Discount percentage').fill('5.00');
+    const responsePromise = page.waitForResponse(response => response.url().endsWith('/api/sales') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Complete sale' }).click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(201);
+    saleId = (await response.json()).id;
+
+    const receipt = page.locator('.receipt');
+    await expect(receipt.locator('.receipt-lines article')).toHaveCount(3);
+    await expect(receipt.getByText(/Black.*2 items per pack/)).toBeVisible();
+    await expect(receipt.getByText(/Gold.*3 items per pack/)).toBeVisible();
+    await expect(receipt.getByText(/Blue.*4 items per pack/)).toBeVisible();
+    await expect(receipt.locator('.receipt-summary').getByText('76.00 EGP', { exact: true })).toBeVisible();
+    await expect(receipt.getByText('Packs / legacy pieces / represented items')).toHaveCount(0);
+  } finally {
+    await page.evaluate(async ({ apiUrl, createdSaleId, createdModelIds }) => {
+      const token = sessionStorage.getItem('accessToken');
+      if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
+      if (createdSaleId) await fetch(`${apiUrl}/sales/${createdSaleId}`, { method: 'DELETE', headers });
+      for (const modelId of createdModelIds) await fetch(`${apiUrl}/models/${modelId}`, { method: 'DELETE', headers });
+    }, { apiUrl: api, createdSaleId: saleId, createdModelIds: modelIds });
+  }
+});

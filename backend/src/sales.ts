@@ -37,6 +37,7 @@ const sale = z.object({
 });
 
 const roundMoney = (value: Prisma.Decimal) => value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+const smallerDecimal = (left: Prisma.Decimal, right: Prisma.Decimal) => left.lte(right) ? left : right;
 
 router.get('/', async (_req, res) => {
   const data = await prisma.sale.findMany({
@@ -135,11 +136,12 @@ router.post('/', validate(sale), async (req, res) => {
     const discountTotal = roundMoney(subtotal.mul(body.discountPercentage).div(100));
     let remainingDiscount = discountTotal;
     const snapshots = calculated.map((entry, index) => {
+      const proportionalAllocation = subtotal.isZero()
+        ? new Prisma.Decimal(0)
+        : roundMoney(entry.lineSubtotal.div(subtotal).mul(discountTotal));
       const allocation = index === calculated.length - 1
         ? remainingDiscount
-        : Prisma.Decimal.min(remainingDiscount, subtotal.isZero()
-          ? new Prisma.Decimal(0)
-          : roundMoney(entry.lineSubtotal.div(subtotal).mul(discountTotal)));
+        : smallerDecimal(remainingDiscount, proportionalAllocation);
       remainingDiscount = remainingDiscount.sub(allocation);
       return { ...entry, discountAllocation: allocation, finalLineTotal: entry.lineSubtotal.sub(allocation) };
     });
