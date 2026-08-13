@@ -9,10 +9,11 @@ const mobileViewports = [
   { width: 768, height: 1024 },
 ];
 const layoutTime = '2026-08-13T10:00:00.000Z';
+const portraitPhoto = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 800"><rect width="400" height="800" fill="#d4b968"/><path d="M80 720 200 80l120 640Z" fill="#171511"/></svg>').toString('base64')}`;
 const layoutState = {
   version: 'layout-test',
   models: [{
-    id: '00000000-0000-4000-8000-000000000101', modelNumber: 'LAYOUT-100', price: '10.00', material: 'Silk', photoUrl: null, isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced',
+    id: '00000000-0000-4000-8000-000000000101', modelNumber: 'LAYOUT-100', price: '10.00', material: 'Silk', photoUrl: portraitPhoto, isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced',
     colours: [{
       id: '00000000-0000-4000-8000-000000000102', modelId: '00000000-0000-4000-8000-000000000101', name: 'Midnight Black', isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced',
       packs: [{ id: '00000000-0000-4000-8000-000000000103', modelColourId: '00000000-0000-4000-8000-000000000102', sizesPerPack: 3, stockQuantity: 4, isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced' }],
@@ -137,6 +138,40 @@ test('compact mobile layout keeps every route and every checkout field usable', 
 
     await page.goto('/sales');
     await expect(page.getByRole('heading', { name: 'Sales & reporting' })).toBeVisible();
+    await expectDocumentContained(page);
+  }
+});
+
+test('dense inventory cards stay compact and keep portrait photos fully visible', async ({ page }) => {
+  await installAuthenticatedState(page);
+
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1000, height: 800 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 320, height: 568 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/inventory');
+
+    const card = page.locator('.inventory-grid .item-card').first();
+    const art = card.locator('.item-art');
+    const photo = art.locator('img');
+    await expect(card).toBeVisible();
+    await expect(photo).toHaveCSS('object-fit', 'contain');
+    await expect(photo).toHaveCSS('object-position', '50% 50%');
+    await expect(card.getByText('LAYOUT-100', { exact: true })).toBeVisible();
+    await expect(card.getByText('Silk', { exact: true })).toBeVisible();
+    await expect(card.getByText(/Midnight Black.*3 sizes.*30\.00 EGP.*4 packs/)).toBeVisible();
+
+    const [cardBox, artBox] = await Promise.all([card.boundingBox(), art.boundingBox()]);
+    expect(Math.round(artBox!.height)).toBe(viewport.width < 360 ? 168 : 180);
+    if (viewport.width > 700) {
+      expect(Math.round(cardBox!.height)).toBeGreaterThanOrEqual(180);
+      expect(Math.round(artBox!.width)).toBe(viewport.width <= 1100 ? 145 : 160);
+      await expect(card).toHaveCSS('flex-direction', 'row');
+    } else {
+      expect(Math.abs(artBox!.width - cardBox!.width)).toBeLessThanOrEqual(2);
+      await expect(card).toHaveCSS('flex-direction', 'column');
+    }
+
+    const editBox = await card.getByRole('button', { name: 'Edit LAYOUT-100' }).boundingBox();
+    expect(editBox!.width).toBeGreaterThanOrEqual(viewport.width <= 700 ? 44 : 36);
     await expectDocumentContained(page);
   }
 });
