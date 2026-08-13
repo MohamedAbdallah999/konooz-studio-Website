@@ -23,7 +23,7 @@ jobs:
       FRONTEND_ORIGIN: http://localhost:5173
       NODE_ENV: test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with: {node-version: 22, cache: npm}
       - run: npm ci
