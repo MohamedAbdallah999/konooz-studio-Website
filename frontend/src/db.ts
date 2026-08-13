@@ -49,6 +49,11 @@ const saleOf = (raw: Sale): Sale => ({ ...raw, totalAmount: normalizeDecimal(raw
 let activeRefresh: Promise<void> | null = null;
 let stateVersion = '';
 
+export async function clearCachedState() {
+  stateVersion = '';
+  await db.delete();
+}
+
 export async function refreshServerState(force = false): Promise<void> {
   if (activeRefresh) { await activeRefresh; if (!force) return; }
   activeRefresh = (async () => {

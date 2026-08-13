@@ -1,14 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { app } from '../src/app.js';
-import { config } from '../src/config.js';
+import { config, jwtIdentity } from '../src/config.js';
 import { prisma } from '../src/db.js';
 
 const enabled = process.env.RUN_DB_TESTS === '1';
 const suite = enabled ? describe : describe.skip;
-const auth = () => ({ Authorization: `Bearer ${jwt.sign({}, config.JWT_ACCESS_SECRET, { subject: crypto.randomUUID(), expiresIn: '15m' })}` });
+const auth = () => ({ Authorization: `Bearer ${jwt.sign({ tokenUse: 'access' }, config.JWT_ACCESS_SECRET, { ...jwtIdentity, algorithm: 'HS256', subject: crypto.randomUUID(), expiresIn: '15m' })}` });
 const modelBody = (modelNumber: string, price = '10.01', stockQuantity = 5) => ({
   modelNumber, price, photoUrl: null, material: 'Silk', isActive: true,
   colours: [{ name: 'Black', isActive: true, packs: [{ sizesPerPack: 3, stockQuantity, isActive: true }] }],
@@ -16,6 +17,7 @@ const modelBody = (modelNumber: string, price = '10.01', stockQuantity = 5) => (
 
 suite('model → colour → pack API', () => {
   beforeEach(async () => {
+    await prisma.loginRateLimit.deleteMany();
     await prisma.saleItem.deleteMany();
     await prisma.sale.deleteMany();
     await prisma.pack.deleteMany();
@@ -26,6 +28,7 @@ suite('model → colour → pack API', () => {
 
   it('requires authentication and performs nested CRUD with optimistic concurrency', async () => {
     await request(app).get('/api/models').expect(401);
+    await request(app).get('/api/models').set('Authorization', `Bearer ${jwt.sign({ tokenUse: 'refresh' }, config.JWT_ACCESS_SECRET, { ...jwtIdentity, algorithm: 'HS256', subject: crypto.randomUUID() })}`).expect(401);
     const created = await request(app).post('/api/models').set(auth()).send(modelBody('M123')).expect(201);
     expect(created.body.price).toBe('10.01');
     expect(created.body.colours[0].packs[0].sizesPerPack).toBe(3);
@@ -61,6 +64,11 @@ suite('model → colour → pack API', () => {
     }
   });
 
+  it('validates stored image content on the server', async () => {
+    await request(app).post('/api/models').set(auth()).send({ ...modelBody('BAD-IMAGE'), photoUrl: 'data:image/png;base64,QUFBQQ==' }).expect(422);
+    await request(app).post('/api/models').set(auth()).send({ ...modelBody('INSECURE-IMAGE'), photoUrl: 'http://example.com/photo.png' }).expect(422);
+  });
+
   it('calculates Decimal totals, preserves snapshots, and restores pack stock on refund', async () => {
     const created = (await request(app).post('/api/models').set(auth()).send(modelBody('DECIMAL', '10.01', 5)).expect(201)).body;
     const colour = created.colours[0], pack = colour.packs[0];
@@ -88,6 +96,60 @@ suite('model → colour → pack API', () => {
     const responses = await Promise.all([request(app).post('/api/sales').set(auth()).send({ items: [line] }), request(app).post('/api/sales').set(auth()).send({ items: [line] })]);
     expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
     expect((await prisma.pack.findUniqueOrThrow({ where: { id: line.packId } })).stockQuantity).toBe(0);
+  });
+
+  it('allocates a multi-line discount while preserving original line totals', async () => {
+    const first = (await request(app).post('/api/models').set(auth()).send(modelBody('MULTI-A', '10.01', 5)).expect(201)).body;
+    const second = (await request(app).post('/api/models').set(auth()).send(modelBody('MULTI-B', '5.55', 5)).expect(201)).body;
+    const sold = (await request(app).post('/api/sales').set(auth()).send({
+      discountPercentage: '7.50',
+      items: [
+        { modelId: first.id, colourId: first.colours[0].id, packId: first.colours[0].packs[0].id, numberOfPacks: 2 },
+        { modelId: second.id, colourId: second.colours[0].id, packId: second.colours[0].packs[0].id, numberOfPacks: 3 },
+      ],
+    }).expect(201)).body;
+    expect(sold.items.map((line: { lineSubtotal: string }) => line.lineSubtotal)).toEqual(['60.06', '49.95']);
+    expect(sold.items.reduce((sum: Prisma.Decimal, line: { discountAllocation: string }) => sum.add(line.discountAllocation), new Prisma.Decimal(0)).toFixed(2)).toBe('8.25');
+    expect(sold.items.every((line: { lineSubtotal: string; discountAllocation: string; finalLineTotal: string }) => new Prisma.Decimal(line.lineSubtotal).sub(line.discountAllocation).eq(line.finalLineTotal))).toBe(true);
+    expect(sold.totalAmount).toBe('101.76');
+  });
+
+  it('enforces exact CORS origins and database-backed login throttling', async () => {
+    const username = 'security-admin';
+    await prisma.adminUser.upsert({ where: { username }, update: {}, create: { username, passwordHash: await bcrypt.hash('correct-password-123', 12) } });
+    await request(app).post('/api/auth/login').set('Origin', 'https://evil.example').send({ username, password: 'correct-password-123' }).expect(403);
+    const successful = await request(app).post('/api/auth/login').set('Origin', config.FRONTEND_ORIGIN).send({ username, password: 'correct-password-123' }).expect(200);
+    expect(successful.body.accessToken).toEqual(expect.any(String));
+    expect(successful.headers['set-cookie']?.[0]).toContain('HttpOnly');
+    const originalCookie = successful.headers['set-cookie']![0]!.split(';')[0]!;
+    const refreshed = await request(app).post('/api/auth/refresh').set('Origin', config.FRONTEND_ORIGIN).set('Cookie', originalCookie).expect(200);
+    const rotatedCookie = refreshed.headers['set-cookie']![0]!.split(';')[0]!;
+    expect(rotatedCookie).not.toBe(originalCookie);
+    await request(app).post('/api/auth/refresh').set('Origin', config.FRONTEND_ORIGIN).set('Cookie', originalCookie).expect(401);
+    await request(app).post('/api/auth/refresh').set('Origin', config.FRONTEND_ORIGIN).set('Cookie', rotatedCookie).expect(200);
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      await request(app).post('/api/auth/login').set('Origin', config.FRONTEND_ORIGIN).send({ username, password: 'wrong-password' }).expect(401);
+    }
+    const blocked = await request(app).post('/api/auth/login').set('Origin', config.FRONTEND_ORIGIN).send({ username, password: 'wrong-password' }).expect(429);
+    expect(blocked.headers['retry-after']).toBeTruthy();
+  });
+
+  it('handles zero, maximum, and invalid percentage discounts', async () => {
+    const zeroModel = (await request(app).post('/api/models').set(auth()).send(modelBody('ZERO-DISCOUNT', '0.01', 5)).expect(201)).body;
+    const zeroPack = zeroModel.colours[0].packs[0];
+    const zero = (await request(app).post('/api/sales').set(auth()).send({ discountPercentage: '0', items: [{ modelId: zeroModel.id, colourId: zeroModel.colours[0].id, packId: zeroPack.id, numberOfPacks: 2 }] }).expect(201)).body;
+    expect(zero.items[0]).toMatchObject({ lineSubtotal: '0.06', finalLineTotal: '0.06' });
+    expect(new Prisma.Decimal(zero.items[0].discountAllocation).eq(0)).toBe(true);
+
+    const maxModel = (await request(app).post('/api/models').set(auth()).send(modelBody('MAX-DISCOUNT', '0.01', 5)).expect(201)).body;
+    const maxPack = maxModel.colours[0].packs[0];
+    const maximum = (await request(app).post('/api/sales').set(auth()).send({ discountPercentage: '100.00', items: [{ modelId: maxModel.id, colourId: maxModel.colours[0].id, packId: maxPack.id, numberOfPacks: 2 }] }).expect(201)).body;
+    expect(maximum.items[0]).toMatchObject({ lineSubtotal: '0.06', discountAllocation: '0.06' });
+    expect(new Prisma.Decimal(maximum.items[0].finalLineTotal).eq(0)).toBe(true);
+    expect(new Prisma.Decimal(maximum.totalAmount).eq(0)).toBe(true);
+    for (const discountPercentage of ['100.01', '-1', 'not-a-number']) {
+      await request(app).post('/api/sales').set(auth()).send({ discountPercentage, items: [{ modelId: maxModel.id, colourId: maxModel.colours[0].id, packId: maxPack.id, numberOfPacks: 1 }] }).expect(422);
+    }
   });
 
   it('enforces database constraints for price, pack size and stock', async () => {

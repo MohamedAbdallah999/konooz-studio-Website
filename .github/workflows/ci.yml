@@ -27,6 +27,7 @@ jobs:
       - uses: actions/setup-node@v5
         with: {node-version: 22, cache: npm}
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run db:migrate -w backend
       - run: npm run db:generate -w backend
       - run: npm run typecheck
@@ -35,6 +36,7 @@ jobs:
           RUN_DB_TESTS: "1"
       - run: npm test -w frontend
       - run: npm run build
+      - run: npm run deploy:check -w backend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - run: npm run test:e2e -w frontend

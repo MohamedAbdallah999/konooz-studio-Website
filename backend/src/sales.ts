@@ -29,9 +29,6 @@ const sale = z.object({
     numberOfPacks: z.number().int().positive().max(MAX_PACKS_PER_LINE),
   }).strict()).min(1).max(250),
 }).strict().superRefine((value, context) => {
-  if (value.discountPercentage.gt(100)) {
-    context.addIssue({ code: 'custom', path: ['discountPercentage'], message: 'Discount must be between 0 and 100' });
-  }
   const packIds = new Set<string>();
   value.items.forEach((line, index) => {
     if (packIds.has(line.packId)) context.addIssue({ code: 'custom', path: ['items', index], message: 'Duplicate pack lines are not allowed' });
@@ -93,11 +90,14 @@ router.post('/', validate(sale), async (req, res) => {
       lineSubtotal: Prisma.Decimal;
     }> = [];
 
+    const requestedPacks = await tx.pack.findMany({
+      where: { id: { in: body.items.map(line => line.packId) } },
+      include: { modelColour: { include: { model: true } } },
+    });
+    const packById = new Map(requestedPacks.map(pack => [pack.id, pack]));
+
     for (const line of body.items) {
-      const pack = await tx.pack.findUnique({
-        where: { id: line.packId },
-        include: { modelColour: { include: { model: true } } },
-      });
+      const pack = packById.get(line.packId);
       const colour = pack?.modelColour;
       const productModel = colour?.model;
       if (!pack || !colour || !productModel || !pack.isActive || !colour.isActive || !productModel.isActive) {
@@ -187,6 +187,7 @@ router.post('/', validate(sale), async (req, res) => {
     }
   }
   if (!result) throw Object.assign(new Error('Inventory changed during checkout. Please try again.'), { status: 409 });
+  console.info(JSON.stringify({ event: 'sale_created', requestId: req.requestId, adminId: req.adminId, saleId: result.id, lineCount: result.items.length }));
   res.status(201).json(result);
 });
 
@@ -198,6 +199,7 @@ router.patch('/:id/pay', async (req, res) => {
     if (existing.paidAmount.gte(existing.totalAmount)) return existing;
     return tx.sale.update({ where: { id }, data: { paidAmount: existing.totalAmount, paidAt: new Date() } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  console.info(JSON.stringify({ event: 'sale_paid', requestId: req.requestId, adminId: req.adminId, saleId: id }));
   res.json(result);
 });
 
@@ -218,6 +220,7 @@ router.delete('/:id', async (req, res) => {
       }
     }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  console.info(JSON.stringify({ event: 'sale_refunded', requestId: req.requestId, adminId: req.adminId, saleId: id }));
   res.status(204).end();
 });
 

@@ -8,6 +8,10 @@ test.skip(process.env.RUN_PRODUCTION_SMOKE !== '1', 'Production smoke is opt-in'
 test.skip(!username || !password, 'Production credentials are required');
 
 test('production model, authoritative sale, immutable receipt, refund, and deactivation', async ({ page }) => {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+  page.on('pageerror', error => pageErrors.push(error.message));
   const suffix = Date.now().toString(36).toUpperCase();
   const modelNumber = `PROD-SMOKE-${suffix}`;
   const customerName = `Production Smoke ${suffix}`;
@@ -66,11 +70,15 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await page.locator('.pack-quantity input').fill('2');
   await page.getByRole('button', { name: 'Add 2 packs' }).click();
   await page.getByLabel('Client name').fill(customerName);
+  await page.getByLabel('Discount percentage').fill('12.50');
   await expect(page.getByText(/30\.03 EGP per pack.*60\.06 EGP line total.*3 remaining/)).toBeVisible();
   await page.getByRole('button', { name: 'Complete sale' }).click();
   await expect(page.locator('.receipt').getByText(modelNumber, { exact: true })).toBeVisible();
-  await expect(page.locator('.receipt').getByText(/Black \/ 3 sizes per pack/)).toBeVisible();
-  await expect(page.locator('.receipt').getByText('60.06 EGP', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('.receipt').getByText(/Black.*3 items per pack/)).toBeVisible();
+  const receiptLine = page.locator('.receipt-lines article').first();
+  await expect(receiptLine.getByText('60.06 EGP', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText('− 7.51 EGP', { exact: true })).toBeVisible();
+  await expect(receiptLine.getByText('52.55 EGP', { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download PDF' }).click();
@@ -98,7 +106,7 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await page.getByPlaceholder(/Search/i).fill(customerName);
   await page.getByRole('button', { name: new RegExp(customerName) }).last().click();
   await expect(page.locator('.receipt').getByText(modelNumber, { exact: true })).toBeVisible();
-  await expect(page.locator('.receipt').getByText(/Black \/ 3 sizes per pack/)).toBeVisible();
+  await expect(page.locator('.receipt').getByText(/Black.*3 items per pack/)).toBeVisible();
 
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Refund sale' }).click();
@@ -116,4 +124,9 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
     return { stock, stillActive: activeModels.some((entry: { id: string }) => entry.id === model.id) };
   }, { apiUrl: api, expectedModel: modelNumber });
   expect(restored).toEqual({ stock: 5, stillActive: false });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/sales');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
 });

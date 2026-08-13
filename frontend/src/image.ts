@@ -21,7 +21,7 @@ const blobToDataUrl=(blob:Blob)=>new Promise<string>((resolve,reject)=>{
 });
 
 export async function optimizeModelPhoto(file:File){
-  if(!file.type.startsWith('image/'))throw new Error('Please choose an image file.');
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Please choose a JPEG, PNG, or WebP image.');
   if(file.size>MAX_INPUT_BYTES)throw new Error('Please choose an image smaller than 15 MB.');
   const sourceUrl=URL.createObjectURL(file);
   try{

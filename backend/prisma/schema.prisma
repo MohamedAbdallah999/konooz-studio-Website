@@ -113,6 +113,7 @@ model Sale {
   syncStatus  SyncStatus @default(synced) @map("sync_status")
   items       SaleItem[]
 
+  @@index([createdAt])
   @@map("sales")
 }
 
@@ -172,6 +173,17 @@ model RefreshSession {
   @@index([adminId])
   @@index([expiresAt])
   @@map("refresh_sessions")
+}
+
+model LoginRateLimit {
+  key             String    @id @db.VarChar(64)
+  failureCount    Int       @default(0) @map("failure_count")
+  windowStartedAt DateTime  @map("window_started_at")
+  blockedUntil    DateTime? @map("blocked_until")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([updatedAt])
+  @@map("login_rate_limits")
 }
 
 model ConflictLog {

@@ -6,9 +6,40 @@ import { validate } from './middleware.js';
 
 const router = Router();
 const timestamp = z.string().datetime();
+const MAX_STORED_IMAGE_BYTES = 1_000_000;
 const price = z.string().trim().regex(/^\d{1,10}(?:\.\d{1,2})?$/)
   .refine(value => new Prisma.Decimal(value).lte(10_000_000), 'Price cannot exceed 10000000')
   .transform(value => new Prisma.Decimal(value));
+
+const photoUrl = z.string().max(1_400_000).superRefine((value, context) => {
+  if (value.startsWith('https://')) {
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || value.length > 2_048) throw new Error();
+      return;
+    } catch {
+      context.addIssue({ code: 'custom', message: 'External photos must use a valid HTTPS URL without credentials' });
+      return;
+    }
+  }
+  const match = value.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i);
+  if (!match || match[2]!.length % 4 !== 0) {
+    context.addIssue({ code: 'custom', message: 'Photo must be a JPEG, PNG, or WebP image' });
+    return;
+  }
+  const bytes = Buffer.from(match[2]!, 'base64');
+  if (!bytes.length || bytes.length > MAX_STORED_IMAGE_BYTES) {
+    context.addIssue({ code: 'custom', message: 'Stored photo cannot exceed 1 MB' });
+    return;
+  }
+  const type = match[1]!.toLowerCase();
+  const valid = type === 'jpeg'
+    ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+    : type === 'png'
+      ? bytes.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))
+      : bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP';
+  if (!valid) context.addIssue({ code: 'custom', message: 'Photo content does not match its declared image type' });
+});
 
 const pack = z.object({
   id: z.string().uuid().optional(),
@@ -39,10 +70,7 @@ const model = z.object({
   expectedUpdatedAt: timestamp.optional(),
   modelNumber: z.string().trim().min(1).max(80),
   price,
-  photoUrl: z.string().max(1_500_000).refine(
-    value => /^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(value) || /^https?:\/\//i.test(value),
-    'Photo must be an uploaded image or a valid web URL',
-  ).nullish(),
+  photoUrl: photoUrl.nullish(),
   material: z.string().max(500).nullish(),
   isActive: z.boolean().default(true),
   colours: z.array(colour).min(1).max(100),
@@ -66,7 +94,7 @@ const activeTree = {
 };
 
 router.get('/', async (req, res) => {
-  const q = String(req.query.q ?? '').trim();
+  const q = z.string().trim().max(100).parse(String(req.query.q ?? ''));
   const data = await prisma.productModel.findMany({
     where: {
       isActive: true,
@@ -110,6 +138,7 @@ router.post('/', validate(model), async (req, res) => {
       include: activeTree,
     });
   });
+  console.info(JSON.stringify({ event: 'model_created', requestId: req.requestId, adminId: req.adminId, modelId: created.id }));
   res.status(201).json(created);
 });
 
@@ -171,6 +200,7 @@ router.put('/:id', validate(model), async (req, res) => {
     await tx.productModel.update({ where: { id }, data: { ...data, id: undefined } });
     return tx.productModel.findUniqueOrThrow({ where: { id }, include: activeTree });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  console.info(JSON.stringify({ event: 'model_updated', requestId: req.requestId, adminId: req.adminId, modelId: id }));
   res.json(updated);
 });
 
@@ -183,6 +213,7 @@ router.delete('/:id', async (req, res) => {
     await tx.modelColour.updateMany({ where: { modelId: id }, data: { isActive: false } });
     await tx.productModel.update({ where: { id }, data: { isActive: false } });
   });
+  console.info(JSON.stringify({ event: 'model_deactivated', requestId: req.requestId, adminId: req.adminId, modelId: id }));
   res.status(204).end();
 });
 

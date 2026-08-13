@@ -52,7 +52,7 @@ npx wrangler login
 
 A browser opens. Sign in to Cloudflare and approve Wrangler. Return to PowerShell after it reports success.
 
-## Step 8 — upload the five Worker secrets
+## Step 8 — upload the four Worker secrets
 
 Keep the PowerShell location inside `backend`.
 
@@ -62,7 +62,7 @@ Keep the PowerShell location inside `backend`.
 npx wrangler secret put DATABASE_URL
 ```
 
-At the prompt, paste the Neon pooled connection string and press Enter.
+At the prompt, paste the Neon pooled connection string for a dedicated runtime role (for example, `konooz_app`) and press Enter. The runtime role should have `CONNECT`/schema `USAGE`, read access to the application tables, and only the insert/update/delete privileges used by the API. Do not run the Worker with `neondb_owner`; keep the owner connection only for Prisma migrations.
 
 ### Frontend origin
 

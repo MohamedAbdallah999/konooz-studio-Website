@@ -4,9 +4,9 @@ Production-oriented server-authoritative model → colour → pack inventory and
 
 ## Included
 
-React 19, Vite, TypeScript, Tailwind, Framer Motion, react-three-fiber/drei; Express 5, Prisma/PostgreSQL, Zod, Helmet, JWT and bcrypt cost 12; authenticated nested model/colour/pack CRUD, repeatable-read state snapshots, stale-write protection, server-authoritative Decimal pricing, transactional pack-stock decrement, immutable sale snapshots, receipt printing/PDF, reporting, Docker, tests, and CI.
+React 19, Vite, TypeScript, CSS, and Framer Motion; Express 5, Prisma/PostgreSQL, Zod, Helmet, JWT and bcrypt cost 12; authenticated nested model/colour/pack CRUD, repeatable-read state snapshots, stale-write protection, server-authoritative Decimal pricing, transactional pack-stock decrement, immutable sale snapshots, receipt printing/PDF, reporting, Docker, tests, and CI.
 
-All dependencies are free/open-source. Fonts are locally bundled SIL-OFL packages. Browser printing replaces paid receipt services, and Pino provides local structured logs instead of paid monitoring.
+All dependencies are free/open-source. Fonts are locally bundled SIL-OFL packages. Browser printing replaces paid receipt services, and the Worker emits structured JSON logs to Cloudflare observability.
 
 ## Local setup
 

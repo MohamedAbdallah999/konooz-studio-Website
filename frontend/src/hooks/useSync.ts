@@ -7,6 +7,7 @@ export function useSync(){
     let retryTimer:number|undefined,retryDelay=1_000,stopped=false;
     const run=async()=>{
       clearTimeout(retryTimer);
+      if(document.visibilityState==='hidden')return;
       if(!navigator.onLine){setOnline(false);setSyncing(false);return}
       setOnline(true);setSyncing(true);
       try{await syncNow();if(!stopped){setError('');retryDelay=1_000}}
@@ -20,7 +21,7 @@ export function useSync(){
     try{channel=typeof BroadcastChannel==='undefined'?null:new BroadcastChannel('konooz-sync')}catch{channel=null}
     if(channel)channel.onmessage=changed;
     addEventListener('online',run);addEventListener('offline',off);addEventListener('focus',run);addEventListener('konooz:data-changed',changed);addEventListener('konooz:sync-request',run);document.addEventListener('visibilitychange',visible);
-    run();const interval=setInterval(run,10_000);
+    void run();const interval=setInterval(run,30_000);
     return()=>{stopped=true;channel?.close();removeEventListener('online',run);removeEventListener('offline',off);removeEventListener('focus',run);removeEventListener('konooz:data-changed',changed);removeEventListener('konooz:sync-request',run);document.removeEventListener('visibilitychange',visible);clearInterval(interval);clearTimeout(retryTimer)};
   },[]);
   return{online,syncing,error};
