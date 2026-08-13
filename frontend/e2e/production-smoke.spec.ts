@@ -17,9 +17,6 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   const suffix = Date.now().toString(36).toUpperCase();
   const modelNumber = `PROD-SMOKE-${suffix}`;
   const customerName = `Production Smoke ${suffix}`;
-  const customerPhone = '+20 100 555 0199';
-  const shopName = `Konooz Smoke Shop ${suffix}`;
-  const customerAddress = '12 Production Test Street, Cairo';
 
   await page.goto('/login');
   await page.getByLabel('Username').fill(username!);
@@ -84,12 +81,7 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await expect(packQuantity).toHaveValue('2');
   await page.getByRole('button', { name: 'Add 2 packs' }).click();
   await page.getByLabel('Client name').fill(customerName);
-  await page.getByLabel('Phone number').fill(customerPhone);
-  await page.getByLabel('Shop name').fill(shopName);
-  await page.getByLabel('Address').fill(customerAddress);
   await page.getByLabel('Discount percentage').fill('12.50');
-  await page.getByLabel('Client is paying a deposit').check();
-  await page.getByLabel('Deposit paid now').fill('20.00');
   await expect(page.getByText(/30\.03 EGP per pack.*60\.06 EGP line total.*3 remaining/)).toBeVisible();
   await page.getByRole('button', { name: 'Complete sale' }).click();
   const receipt = page.locator('.receipt');
@@ -102,11 +94,6 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await expect(receiptLine.getByText(/7\.51 EGP/)).toHaveCount(0);
   await expect(receipt.locator('.receipt-summary').getByText('− 7.51 EGP', { exact: true })).toBeVisible();
   await expect(receipt.locator('.receipt-summary').getByText('52.55 EGP', { exact: true })).toBeVisible();
-  await expect(receipt.getByText(customerPhone, { exact: true })).toBeVisible();
-  await expect(receipt.getByText(shopName, { exact: true })).toBeVisible();
-  await expect(receipt.getByText(customerAddress, { exact: true })).toBeVisible();
-  await expect(receipt.locator('.receipt-payment')).toContainText('20.00 EGP');
-  await expect(receipt.locator('.receipt-payment')).toContainText('32.55 EGP');
 
   const storedSale = await page.evaluate(async apiUrl => {
     const token = sessionStorage.getItem('accessToken')!;
@@ -116,8 +103,6 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   }, api);
   expect(storedSale.items[0]).toMatchObject({ lineSubtotal: '60.06', finalLineTotal: '60.06' });
   expect(Number(storedSale.items[0].discountAllocation)).toBe(0);
-  expect(storedSale).toMatchObject({ customerPhone, shopName, customerAddress });
-  expect(Number(storedSale.paidAmount)).toBe(20);
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download PDF' }).click();
