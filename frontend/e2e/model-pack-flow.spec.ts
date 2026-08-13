@@ -79,6 +79,18 @@ test('complete model-pack sale, immutable receipt, PDF, refund, and deactivation
   await page.getByText(/Snapshot Customer/).last().click();
   await expect(page.locator('.receipt').getByText('Refunded', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refund sale' })).toHaveCount(0);
+  const refundedSaleId = await page.evaluate(async () => {
+    const api = 'http://127.0.0.1:4010/api', token = sessionStorage.getItem('accessToken')!, headers = { Authorization: `Bearer ${token}` };
+    const sales = await (await fetch(`${api}/sales`, { headers })).json();
+    return sales.find((sale: { customerName?: string }) => sale.customerName === 'Snapshot Customer').id as string;
+  });
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete receipt' }).click();
+  const deletionToken = await page.evaluate(() => sessionStorage.getItem('accessToken')!);
+  const deletionHeaders = { Authorization: `Bearer ${deletionToken}` };
+  const deletedRead = await page.request.get(`http://127.0.0.1:4010/api/sales/${refundedSaleId}`, { headers: deletionHeaders });
+  const remainingSales = await (await page.request.get('http://127.0.0.1:4010/api/sales', { headers: deletionHeaders })).json();
+  expect({ readStatus: deletedRead.status(), stillListed: remainingSales.some((sale: { id: string }) => sale.id === refundedSaleId) }).toEqual({ readStatus: 404, stillListed: false });
 
   const result = await page.evaluate(async () => {
     const api = 'http://127.0.0.1:4010/api', token = sessionStorage.getItem('accessToken')!, headers = { Authorization: `Bearer ${token}` };
@@ -128,7 +140,9 @@ test('completes one sale with multiple models and multiple colours', async ({ pa
     const addLine = async (modelNumber: string, colour: string, sizesPerPack: number) => {
       await page.locator('.model-options').getByRole('button', { name: new RegExp(modelNumber) }).click();
       await page.getByRole('button', { name: new RegExp(`^${colour}`) }).click();
-      await page.getByRole('button', { name: new RegExp(`${sizesPerPack} sizes per pack`) }).click();
+      const packOption = page.getByRole('button', { name: new RegExp(`${sizesPerPack} sizes per pack`) });
+      await expect(packOption).toHaveCSS('flex-direction', 'column');
+      await packOption.click();
       await page.getByRole('button', { name: 'Add 1 pack' }).click();
     };
     await addLine(firstModelNumber, 'Black', 2);

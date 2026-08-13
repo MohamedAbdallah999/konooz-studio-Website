@@ -249,3 +249,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   .topbar{min-height:54px;padding-top:7px;padding-bottom:7px}.receipt-actions{top:54px}
   .login-brand{min-height:100dvh}.login-form{min-height:100dvh}
 }
+
+/* Readable vertical pack choices and irreversible receipt action. */
+.variant-buttons.pack-options{align-items:stretch;justify-content:flex-start}
+.variant-buttons.pack-options button{display:flex;flex:1 1 180px;min-width:min(180px,100%);max-width:260px;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;padding:12px;text-align:left;white-space:normal}
+.pack-option-title{display:block;width:100%;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+.variant-buttons.pack-options .pack-option-price,.variant-buttons.pack-options .pack-option-stock{display:block;width:100%;line-height:1.35;overflow-wrap:anywhere}
+.variant-buttons.pack-options .pack-option-price{color:var(--ink);font-weight:700}
+.variant-buttons.pack-options .pack-option-stock{color:var(--muted)}
+.delete-receipt-button{border:1px solid #8d251d;background:#8d251d;color:#fff;border-radius:2px;padding:13px 18px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:9px}
+.delete-receipt-button:hover{background:#6f1d17;border-color:#6f1d17}
+@media screen and (max-width:600px){.variant-buttons.pack-options{grid-template-columns:1fr}.variant-buttons.pack-options button{width:100%;max-width:none;min-height:78px}.delete-receipt-button{min-height:44px;padding:9px;font-size:11px}}

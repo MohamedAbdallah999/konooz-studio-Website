@@ -146,3 +146,13 @@ export async function refundSale(sale: Sale) {
   await request(`/sales/${sale.id}`, { method: 'DELETE' });
   await refreshAfterWrite();
 }
+
+export async function deleteSalePermanently(sale: Sale) {
+  if (!sale.deletedAt) await request(`/sales/${sale.id}`, { method: 'DELETE' });
+  await request(`/sales/${sale.id}/permanent`, { method: 'DELETE' });
+  await db.transaction('rw', [db.sales, db.saleItems], async () => {
+    await db.saleItems.where('saleId').equals(sale.id).delete();
+    await db.sales.delete(sale.id);
+  });
+  await refreshAfterWrite();
+}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Search, Minus, Plus, ShoppingBag, X, Check } from 'lucide-react';
-import { db, createSale } from '../db';
+import { db, createSale, deleteSalePermanently } from '../db';
 import type { ModelColour, Pack, ProductModel, Sale } from '../types';
 import { Receipt } from './Receipt';
 import { colorSwatch } from '../colorSwatch';
@@ -53,7 +53,13 @@ export function Sell() {
     finally { setBusy(false); }
   };
 
-  if (receipt) return <Receipt sale={receipt} onClose={() => setReceipt(null)}/>;
+  const permanentlyDeleteReceipt = async () => {
+    if (!receipt || !confirm(`Permanently delete receipt #${receipt.id.slice(0, 8).toUpperCase()}? It will be refunded first so its pack quantities return to inventory. This cannot be undone.`)) return;
+    try { await deleteSalePermanently(receipt); setReceipt(null); }
+    catch (cause) { alert(cause instanceof Error ? cause.message : 'Unable to delete this receipt.'); }
+  };
+
+  if (receipt) return <Receipt sale={receipt} onClose={() => setReceipt(null)} onDelete={permanentlyDeleteReceipt}/>;
   return <div className="sell-layout">
     <section>
       <div className="section-head compact"><div><p className="eyebrow">NEW TRANSACTION</p><AnimatedTitle>Select packs</AnimatedTitle><p>Model → colour → pack → number of packs</p></div></div>
@@ -61,7 +67,7 @@ export function Sell() {
       <div className="selection-flow">
         <div><span>1 · Model</span><div className="model-options">{results.map(model => <button key={model.id} className={selectedModelId === model.id ? 'selected' : ''} onClick={() => { setSelectedModelId(model.id); setSelectedColourId(''); setSelectedPackId(''); }}><b>{model.modelNumber}</b><small>{formatMoney(model.price)} per size</small></button>)}</div></div>
         {selectedModel && <div><span>2 · Colour</span><div className="variant-buttons">{selectedModel.colours.filter(colour => colour.isActive).map(colour => <button key={colour.id} className={selectedColourId === colour.id ? 'selected' : ''} onClick={() => { setSelectedColourId(colour.id); setSelectedPackId(''); }}><span><i className="color-swatch" style={{ backgroundColor: colorSwatch(colour.name) }}/>{colour.name}</span></button>)}</div></div>}
-        {selectedColour && <div><span>3 · Pack</span><div className="variant-buttons">{selectedColour.packs.filter(pack => pack.isActive).map(pack => { const left = packsRemaining(pack); return <button key={pack.id} disabled={!left} className={`${selectedPackId === pack.id ? 'selected ' : ''}${!left ? 'out-of-stock' : ''}`} onClick={() => setSelectedPackId(pack.id)}><span>{pack.sizesPerPack} sizes per pack</span><small>{formatMoney(multiplyMoney(selectedModel!.price, pack.sizesPerPack))} · {left} packs left</small></button>; })}</div></div>}
+        {selectedColour && <div><span>3 · Pack</span><div className="variant-buttons pack-options">{selectedColour.packs.filter(pack => pack.isActive).map(pack => { const left = packsRemaining(pack); return <button key={pack.id} disabled={!left} className={`${selectedPackId === pack.id ? 'selected ' : ''}${!left ? 'out-of-stock' : ''}`} onClick={() => setSelectedPackId(pack.id)}><span className="pack-option-title">{pack.sizesPerPack} sizes per pack</span><small className="pack-option-price">{formatMoney(multiplyMoney(selectedModel!.price, pack.sizesPerPack))}</small><small className="pack-option-stock">{left} packs left</small></button>; })}</div></div>}
         {selectedPack && <div className="pack-quantity"><span>4 · Number of packs</span><NumberInput inputMode="numeric" min="1" max={packsRemaining(selectedPack)} step="1" value={numberOfPacks} onChange={event => setNumberOfPacks(Math.max(1, Number(event.target.value) || 1))}/><button className="primary" disabled={!packsRemaining(selectedPack)} onClick={addSelected}><Plus/> Add {numberOfPacks} {numberOfPacks === 1 ? 'pack' : 'packs'}</button><small>{selectedPack.sizesPerPack * numberOfPacks} represented sizes · {formatMoney(multiplyMoney(multiplyMoney(selectedModel!.price, selectedPack.sizesPerPack), numberOfPacks))}</small></div>}
       </div>
     </section>

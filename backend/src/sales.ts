@@ -197,6 +197,20 @@ router.patch('/:id/pay', async (req, res) => {
   res.json(result);
 });
 
+router.delete('/:id/permanent', async (req, res) => {
+  const id = z.string().uuid().parse(req.params.id);
+  await prisma.$transaction(async tx => {
+    const existing = await tx.sale.findUnique({ where: { id } });
+    if (!existing) throw Object.assign(new Error('Receipt not found'), { status: 404 });
+    if (!existing.deletedAt) {
+      throw Object.assign(new Error('Refund the receipt before permanently deleting it so inventory is restored.'), { status: 409 });
+    }
+    await tx.sale.delete({ where: { id } });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  console.info(JSON.stringify({ event: 'sale_deleted_permanently', requestId: req.requestId, adminId: req.adminId, saleId: id }));
+  res.status(204).end();
+});
+
 router.delete('/:id', async (req, res) => {
   const id = z.string().uuid().parse(req.params.id);
   await prisma.$transaction(async tx => {

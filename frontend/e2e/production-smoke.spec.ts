@@ -71,7 +71,11 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   await page.goto('/sell');
   await page.getByRole('button', { name: new RegExp(modelNumber) }).click();
   await page.getByRole('button', { name: /Black/ }).click();
-  await page.getByRole('button', { name: /3 sizes per pack/ }).click();
+  const packOption = page.getByRole('button', { name: /3 sizes per pack/ });
+  await expect(packOption).toHaveCSS('flex-direction', 'column');
+  await expect(packOption.locator('.pack-option-price')).toBeVisible();
+  await expect(packOption.locator('.pack-option-stock')).toBeVisible();
+  await packOption.click();
   const packQuantity = page.locator('.pack-quantity input');
   await packQuantity.click();
   await packQuantity.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
@@ -135,6 +139,14 @@ test('production model, authoritative sale, immutable receipt, refund, and deact
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Refund sale' }).click();
   await expect(page.getByText('Refunded', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: new RegExp(customerName) }).last().click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete receipt' }).click();
+  const deletionToken = await page.evaluate(() => sessionStorage.getItem('accessToken')!);
+  const deletionHeaders = { Authorization: `Bearer ${deletionToken}` };
+  const deletedRead = await page.request.get(`${api}/sales/${storedSale.id}`, { headers: deletionHeaders });
+  const remainingSales = await (await page.request.get(`${api}/sales`, { headers: deletionHeaders })).json();
+  expect({ readStatus: deletedRead.status(), stillListed: remainingSales.some((sale: { id: string }) => sale.id === storedSale.id) }).toEqual({ readStatus: 404, stillListed: false });
 
   const restored = await page.evaluate(async ({ apiUrl, expectedModel }) => {
     const token = sessionStorage.getItem('accessToken')!;

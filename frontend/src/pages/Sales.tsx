@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { TrendingUp, ReceiptText, Clock3, Search } from 'lucide-react';
-import { db, refundSale, markSalePaid } from '../db';
+import { db, deleteSalePermanently, refundSale, markSalePaid } from '../db';
 import type { Sale } from '../types';
 import { Receipt } from './Receipt';
 import { paidAmountOf, outstandingAmountOf, paymentEvents } from '../payments';
@@ -23,8 +23,13 @@ export function Sales() {
   const revenue = activeSales.reduce((sum, sale) => addMoney(sum, paidAmountOf(sale)), '0.00'), outstanding = activeSales.reduce((sum, sale) => addMoney(sum, outstandingAmountOf(sale)), '0.00');
   const showReceipt = async (sale: Sale) => { const lines = sale.items?.length ? sale.items : await db.saleItems.where('saleId').equals(sale.id).toArray(); setSelected({ ...sale, items: lines }); };
   const refund = async () => { if (!selected || !confirm(`Refund receipt #${selected.id.slice(0, 8).toUpperCase()}? Its pack quantities will return to inventory.`)) return; await refundSale(selected); setSelected(null); };
+  const permanentlyDelete = async () => {
+    if (!selected || !confirm(`Permanently delete receipt #${selected.id.slice(0, 8).toUpperCase()}?${selected.deletedAt ? '' : ' It will be refunded first so its pack quantities return to inventory.'} This cannot be undone.`)) return;
+    try { await deleteSalePermanently(selected); setSelected(null); }
+    catch (error) { alert(error instanceof Error ? error.message : 'Unable to delete this receipt.'); }
+  };
   const markPaid = async () => { if (!selected || !confirm(`Mark the outstanding ${formatMoney(outstandingAmountOf(selected))} as paid?`)) return; setSelected(await markSalePaid(selected)); };
-  if (selected) return <Receipt sale={selected} onClose={() => setSelected(null)} onRefund={selected.deletedAt ? undefined : refund} onMarkPaid={!selected.deletedAt && compareMoney(selected.paidAmount, selected.totalAmount) < 0 ? markPaid : undefined}/>;
+  if (selected) return <Receipt sale={selected} onClose={() => setSelected(null)} onRefund={selected.deletedAt ? undefined : refund} onMarkPaid={!selected.deletedAt && compareMoney(selected.paidAmount, selected.totalAmount) < 0 ? markPaid : undefined} onDelete={permanentlyDelete}/>;
   const outstandingSales = filteredSales.filter(sale => !sale.deletedAt && compareMoney(paidAmountOf(sale), sale.totalAmount) < 0);
   return <>
     <section className="section-head"><div><p className="eyebrow">THE LEDGER</p><AnimatedTitle>Sales & reporting</AnimatedTitle><p>Revenue includes only money received. Every receipt reads immutable sale-time snapshots.</p></div></section>

@@ -4,7 +4,7 @@ import { prisma } from './db.js';
 
 const router = Router();
 const versionQuery = Prisma.sql`
-  SELECT COALESCE(MAX(updated_at), TIMESTAMP 'epoch')::text AS version
+  SELECT COALESCE(MAX(updated_at), TIMESTAMP 'epoch')::text || ':' || COUNT(*)::text AS version
   FROM (
     SELECT updated_at FROM models
     UNION ALL SELECT updated_at FROM model_colours

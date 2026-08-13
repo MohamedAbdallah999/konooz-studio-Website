@@ -34,7 +34,8 @@ function server(initialModels: ProductModel[] = [], initialSales: Sale[] = []) {
       sales.push(created); return json(created, 201);
     }
     if (url.endsWith('/pay') && method === 'PATCH') { const id = url.split('/').at(-2); sales = sales.map(sale => sale.id === id ? { ...sale, paidAmount: sale.totalAmount, paidAt: time } : sale); return json(sales.find(sale => sale.id === id)); }
-    if (url.includes('/sales/') && method === 'DELETE') { const id = url.split('/').pop(), sale = sales.find(value => value.id === id)!; for (const line of sale.items) if (line.packId && line.numberOfPacks) models[0]!.colours[0]!.packs[0]!.stockQuantity += line.numberOfPacks; sales = sales.filter(value => value.id !== id); return json(null, 204); }
+    if (url.endsWith('/permanent') && method === 'DELETE') { const id = url.split('/').at(-2); sales = sales.filter(value => value.id !== id); return json(null, 204); }
+    if (url.includes('/sales/') && method === 'DELETE') { const id = url.split('/').pop(), sale = sales.find(value => value.id === id)!; if (!sale.deletedAt) { for (const line of sale.items) if (line.packId && line.numberOfPacks) models[0]!.colours[0]!.packs[0]!.stockQuantity += line.numberOfPacks; sale.deletedAt = time; } return json(null, 204); }
     throw new Error(`Unexpected request ${method} ${url}`);
   });
   vi.stubGlobal('fetch', fetchMock); return fetchMock;
@@ -53,6 +54,7 @@ describe('model-pack CRUD and canonical sale flow', () => {
     const sale = await module.createSale([{ modelId: model.id, colourId: colour.id, packId: pack.id, numberOfPacks: 2 }], { depositAmount: '20.00' });
     expect(sale.totalAmount).toBe('60.00'); expect((await module.db.packs.get(pack.id))?.stockQuantity).toBe(3);
     const paid = await module.markSalePaid(sale); expect(paid.paidAmount).toBe('60.00');
-    await module.refundSale(paid); expect((await module.db.packs.get(pack.id))?.stockQuantity).toBe(5); expect(await module.db.sales.count()).toBe(0);
+    await module.refundSale(paid); expect((await module.db.packs.get(pack.id))?.stockQuantity).toBe(5); expect(await module.db.sales.count()).toBe(1); expect((await module.db.sales.get(sale.id))?.deletedAt).toBe(time);
+    await module.deleteSalePermanently((await module.db.sales.get(sale.id))!); expect(await module.db.sales.count()).toBe(0); expect(await module.db.saleItems.count()).toBe(0);
   });
 });

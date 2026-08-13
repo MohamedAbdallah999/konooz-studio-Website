@@ -8,6 +8,18 @@ const mobileViewports = [
   { width: 412, height: 915 },
   { width: 768, height: 1024 },
 ];
+const layoutTime = '2026-08-13T10:00:00.000Z';
+const layoutState = {
+  version: 'layout-test',
+  models: [{
+    id: '00000000-0000-4000-8000-000000000101', modelNumber: 'LAYOUT-100', price: '10.00', material: 'Silk', photoUrl: null, isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced',
+    colours: [{
+      id: '00000000-0000-4000-8000-000000000102', modelId: '00000000-0000-4000-8000-000000000101', name: 'Midnight Black', isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced',
+      packs: [{ id: '00000000-0000-4000-8000-000000000103', modelColourId: '00000000-0000-4000-8000-000000000102', sizesPerPack: 3, stockQuantity: 4, isActive: true, createdAt: layoutTime, updatedAt: layoutTime, syncStatus: 'synced' }],
+    }],
+  }],
+  sales: [],
+};
 
 async function installAuthenticatedState(page: Page) {
   await page.addInitScript(() => {
@@ -18,7 +30,7 @@ async function installAuthenticatedState(page: Page) {
   await page.route('http://localhost:4000/api/**', async route => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith('/state')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: 'layout-test', models: [], sales: [] }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(layoutState) });
       return;
     }
     await route.fulfill({ status: 204 });
@@ -103,6 +115,17 @@ test('compact mobile layout keeps every route and every checkout field usable', 
 
     await page.goto('/sell');
     await expect(page.getByRole('heading', { name: 'Select packs' })).toBeVisible();
+    await page.getByRole('button', { name: /LAYOUT-100/ }).click();
+    await page.getByRole('button', { name: /Midnight Black/ }).click();
+    const packOption = page.getByRole('button', { name: /3 sizes per pack/ });
+    await expect(packOption).toHaveCSS('flex-direction', 'column');
+    const [titleBox, priceBox, stockBox] = await Promise.all([
+      packOption.locator('.pack-option-title').boundingBox(),
+      packOption.locator('.pack-option-price').boundingBox(),
+      packOption.locator('.pack-option-stock').boundingBox(),
+    ]);
+    expect(priceBox!.y).toBeGreaterThan(titleBox!.y);
+    expect(stockBox!.y).toBeGreaterThan(priceBox!.y);
     for (const label of ['Client name', 'Phone number', 'Shop name', 'Address', 'Discount percentage']) {
       await expect(page.getByLabel(label)).toBeVisible();
     }

@@ -69,7 +69,7 @@ suite('model → colour → pack API', () => {
     await request(app).post('/api/models').set(auth()).send({ ...modelBody('INSECURE-IMAGE'), photoUrl: 'http://example.com/photo.png' }).expect(422);
   });
 
-  it('calculates Decimal totals, preserves snapshots, and restores pack stock on refund', async () => {
+  it('calculates Decimal totals, preserves snapshots, restores stock on refund, and permanently deletes receipt rows', async () => {
     const created = (await request(app).post('/api/models').set(auth()).send(modelBody('DECIMAL', '10.01', 5)).expect(201)).body;
     const colour = created.colours[0], pack = colour.packs[0];
     const sold = (await request(app).post('/api/sales').set(auth()).send({ discountPercentage: '12.50', depositAmount: '10.00', items: [{ modelId: created.id, colourId: colour.id, packId: pack.id, numberOfPacks: 2 }] }).expect(201)).body;
@@ -88,6 +88,20 @@ suite('model → colour → pack API', () => {
     const refundedHistory = (await request(app).get(`/api/sales/${sold.id}`).set(auth()).expect(200)).body;
     expect(refundedHistory.deletedAt).toBeTruthy();
     expect(refundedHistory.items[0]).toMatchObject({ modelNumberAtSale: 'DECIMAL', colourNameAtSale: 'Black', sizesPerPackAtSale: 3 });
+    await request(app).delete(`/api/sales/${sold.id}/permanent`).set(auth()).expect(204);
+    await request(app).get(`/api/sales/${sold.id}`).set(auth()).expect(404);
+    expect(await prisma.sale.findUnique({ where: { id: sold.id } })).toBeNull();
+    expect(await prisma.saleItem.count({ where: { saleId: sold.id } })).toBe(0);
+    expect((await prisma.pack.findUniqueOrThrow({ where: { id: pack.id } })).stockQuantity).toBe(5);
+  });
+
+  it('refuses permanent deletion until the receipt inventory has been refunded', async () => {
+    const created = (await request(app).post('/api/models').set(auth()).send(modelBody('DELETE-SAFETY', '5.00', 2)).expect(201)).body;
+    const colour = created.colours[0], pack = colour.packs[0];
+    const sold = (await request(app).post('/api/sales').set(auth()).send({ items: [{ modelId: created.id, colourId: colour.id, packId: pack.id, numberOfPacks: 1 }] }).expect(201)).body;
+    await request(app).delete(`/api/sales/${sold.id}/permanent`).set(auth()).expect(409);
+    expect(await prisma.sale.findUnique({ where: { id: sold.id } })).not.toBeNull();
+    expect((await prisma.pack.findUniqueOrThrow({ where: { id: pack.id } })).stockQuantity).toBe(1);
   });
 
   it('allows only one of two concurrent checkouts to reserve the final pack', async () => {

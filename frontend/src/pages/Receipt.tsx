@@ -1,12 +1,12 @@
 import type { Sale } from '../types';
-import { Printer, ArrowLeft, FileDown, RotateCcw, BadgeCheck } from 'lucide-react';
+import { Printer, ArrowLeft, FileDown, RotateCcw, BadgeCheck, Trash2 } from 'lucide-react';
 import { compareMoney, formatMoney, normalizeDecimal, subtractMoney } from '../money';
 import { receiptSummary } from '../receipt';
 import { buildReceiptPdf } from '../receiptPdf';
 
 const receiptMoneyValue = (value: string | number) => formatMoney(value).replace(/\sEGP$/, '');
 
-export function Receipt({ sale, onClose, onRefund, onMarkPaid }: { sale: Sale; onClose: () => void; onRefund?: () => void; onMarkPaid?: () => void }) {
+export function Receipt({ sale, onClose, onRefund, onMarkPaid, onDelete }: { sale: Sale; onClose: () => void; onRefund?: () => void; onMarkPaid?: () => void; onDelete?: () => void }) {
   const receiptNumber = sale.id.slice(0, 8).toUpperCase(), summary = receiptSummary(sale), facts = summary.lines;
   const paid = normalizeDecimal(sale.paidAmount ?? sale.totalAmount);
   const outstanding = compareMoney(sale.totalAmount, paid) > 0 ? subtractMoney(sale.totalAmount, paid) : '0.00';
@@ -23,7 +23,7 @@ export function Receipt({ sale, onClose, onRefund, onMarkPaid }: { sale: Sale; o
   };
 
   return <>
-    <div className="receipt-actions no-print"><button className="secondary" onClick={onClose}><ArrowLeft/> Back</button><div>{onRefund && <button className="refund-button" onClick={onRefund}><RotateCcw/> Refund sale</button>}{onMarkPaid && <button className="primary pay-button" onClick={onMarkPaid}><BadgeCheck/> Mark as paid</button>}<button className="secondary" onClick={downloadPdf}><FileDown/> Download PDF</button><button className="primary" onClick={() => { window.focus(); window.print(); }}><Printer/> Print receipt</button></div></div>
+    <div className="receipt-actions no-print"><button className="secondary" onClick={onClose}><ArrowLeft/> Back</button><div>{onRefund && <button className="refund-button" onClick={onRefund}><RotateCcw/> Refund sale</button>}{onMarkPaid && <button className="primary pay-button" onClick={onMarkPaid}><BadgeCheck/> Mark as paid</button>}{onDelete && <button className="delete-receipt-button" onClick={onDelete}><Trash2/> Delete receipt</button>}<button className="secondary" onClick={downloadPdf}><FileDown/> Download PDF</button><button className="primary" onClick={() => { window.focus(); window.print(); }}><Printer/> Print receipt</button></div></div>
     <section className="receipt" aria-label={`Receipt ${receiptNumber}`}>
       <header className="receipt-brand"><img src="/brand/konooz-wordmark-transparent.png" alt="Konooz"/><p className="tagline">THE STYLE YOU LOVE</p></header>
       <div className="receipt-rule"/>
