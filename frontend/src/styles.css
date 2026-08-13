@@ -196,3 +196,56 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 @media screen and (min-width:901px) and (max-width:1100px){
   .app-shell{--sidebar-width:205px}
 }
+
+/* Compact, touch-friendly application layout for phones and tablets. */
+@media screen and (max-width:900px){
+  html{scroll-padding-top:calc(72px + env(safe-area-inset-top))}
+  body{overscroll-behavior-y:none}
+  .app-shell>main{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+  .topbar{height:auto;min-height:calc(64px + env(safe-area-inset-top));padding:calc(9px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 9px max(16px,env(safe-area-inset-left))}
+  .topbar h1{font-size:18px}.topbar .eyebrow{margin-bottom:4px}
+  .sync-pill{min-width:44px;min-height:44px;justify-content:center}
+  .page{width:100%;max-width:100%;padding:clamp(14px,3vw,24px) max(clamp(14px,3vw,24px),env(safe-area-inset-right)) 24px max(clamp(14px,3vw,24px),env(safe-area-inset-left))}
+  .mobile-nav{min-height:64px;grid-template-columns:repeat(5,minmax(0,1fr));padding:5px max(4px,env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(4px,env(safe-area-inset-left))}
+  .mobile-nav a,.mobile-logout{min-width:0;min-height:52px;padding:4px 2px;justify-content:center;line-height:1.15}
+  .mobile-nav span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .section-head{margin:32px 0 18px;align-items:flex-end}.section-head.compact{margin-top:0}.section-head h2{font-size:clamp(32px,6vw,40px);line-height:.95}.section-head p:last-child{line-height:1.55}
+  .search{min-height:48px;height:auto;margin-bottom:16px;padding:8px 13px}.search input{min-height:30px}
+  .actions,.inventory-grid,.selection-flow,.sell-layout,.basket,.basket-lines,.checkout-details,.report-stats,.chart-card,.ledger,.receipt{min-width:0}
+  .primary,.secondary,.refund-button,.model-options button,.variant-buttons button{min-height:44px}
+  .modal-backdrop{align-items:end;padding:max(10px,env(safe-area-inset-top)) 0 0}
+  .modal{width:100%;max-height:calc(100dvh - max(10px,env(safe-area-inset-top)));border-radius:14px 14px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));overscroll-behavior:contain}
+  .modal>header{position:sticky;top:-20px;z-index:3;margin:-20px -18px 0;padding:20px 18px 12px;background:var(--white);border-bottom:1px solid var(--line)}
+  .modal>footer{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom));z-index:3;margin:12px -18px calc(-18px - env(safe-area-inset-bottom));padding:12px 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);border-top:1px solid var(--line)}
+  .modal .icon,.item-art button,.item-meta button,.colour-editor>header button,.pack-row>button,.quantity button,.remove{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  .receipt-actions{top:calc(64px + env(safe-area-inset-top));padding:7px 0;background:var(--ivory)}
+  .receipt{overflow:visible}
+}
+
+@media screen and (max-width:600px){
+  .login-brand{height:32dvh;min-height:205px}.login-copy{padding:22px;justify-content:flex-end}.login-copy img{width:120px;margin-bottom:6px}.login-copy h1{font-size:clamp(34px,11vw,42px);margin:6px 0 2px}.login-form{padding:26px 20px calc(34px + env(safe-area-inset-bottom))}.login-form h2{font-size:34px}.login-form label{margin-top:18px}.login-form input{min-height:48px}.login-form .primary{min-height:48px;margin:22px 0}.lock{width:42px;height:42px;margin-bottom:17px}
+  .hero{min-height:356px;padding:24px 20px;grid-template-rows:auto auto}.hero-copy h2{font-size:clamp(39px,12vw,48px);margin:14px 0}.hero-copy>p:not(.eyebrow){font-size:12px;line-height:1.5;margin-bottom:10px}.hero-copy .primary{margin-top:8px}.hero-figure{margin-top:22px;padding:14px 16px}.hero-figure strong{font-size:25px}
+  .stats article{min-height:102px;padding:13px 6px}.stats span{font-size:9px}.stats small{font-size:8px;line-height:1.25}.stats strong{font-size:24px}
+  .section-head{margin:28px 0 16px;gap:10px}.section-head h2{font-size:32px}.section-head>button{min-height:44px}.actions{gap:9px}.actions a{min-height:112px;padding:17px}.actions h3{font-size:22px;margin:16px 0 5px}.actions p{margin-bottom:0;line-height:1.45}
+  .inventory-grid{gap:11px}.item-info{padding:15px}.item-info h3{font-size:24px}.chips{margin:12px 0}.chips span{max-width:100%;overflow-wrap:anywhere}.empty{padding:48px 18px}
+  .selection-flow{gap:11px}.selection-flow>div{padding:14px}.selection-flow>div>span{margin-bottom:9px}.model-options,.variant-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.model-options button,.variant-buttons button{width:100%;min-width:0;padding:10px;overflow-wrap:anywhere}.variant-buttons button>span{min-width:0}.pack-quantity{grid-template-columns:88px minmax(0,1fr)!important;gap:8px!important}.pack-quantity>span,.pack-quantity>small{grid-column:1/-1}.pack-quantity input{width:100%;min-height:46px}.pack-quantity .primary{width:100%;padding-inline:10px}
+  .basket{margin-top:2px;border-radius:8px}.basket header,.basket footer,.checkout-details{padding:15px}.basket-empty{padding:34px 18px}.basket-lines article{grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:14px}.basket-lines article>div:first-child{grid-column:1/-1;min-width:0}.basket-lines article>div:first-child b,.basket-lines article>div:first-child span,.basket-lines article>div:first-child small{overflow-wrap:anywhere}.basket-lines .quantity{grid-column:1;gap:6px}.basket-lines .remove{grid-column:2;grid-row:2}.basket-lines .quantity .quantity-input{width:62px;height:44px}.quantity button{width:44px;height:44px;padding:10px}.remove svg{width:18px}
+  .client-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 10px}.checkout-details label{min-width:0;margin:0;line-height:1.35}.checkout-details input:not([type=checkbox]){min-height:46px;width:100%;padding:11px}.client-details .wide,.payment-toggle{grid-column:1/-1}.payment-toggle{min-height:44px;padding:8px 0;align-self:auto}.payment-toggle input{width:20px;height:20px;flex:0 0 auto}.basket footer>div{gap:15px}.basket footer span,.basket footer b,.basket footer strong{overflow-wrap:anywhere}.sale-button{min-height:50px}
+  .report-stats.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.report-stats.three article{min-width:0;padding:15px}.report-stats.three article:last-child{grid-column:1/-1}.report-stats strong{font-size:23px}.chart-card,.ledger{padding:14px}.chart{height:190px}.ledger h3{font-size:22px}.ledger article{min-height:62px}.ledger article>div:nth-child(2) b,.ledger article>div:nth-child(2) span{max-width:100%}
+  .receipt-actions{gap:7px}.receipt-actions>button{min-height:44px}.receipt-actions>div{gap:6px}.receipt-actions>div button{min-height:44px}.receipt{padding:20px 14px}.receipt-brand img{width:125px}.receipt-rule{margin:15px 0}.receipt-overview>div{padding:10px}.receipt-client{padding:10px 12px;margin-top:11px}.receipt-client dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.receipt-purchases{margin-top:17px;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}.receipt-item-table{min-width:540px}.receipt-financials{margin-top:15px}.receipt-payment{margin-top:14px;padding:11px}.receipt footer{margin-top:25px;padding-top:18px}
+  .form-grid label{margin-top:17px}.variants{margin-top:20px}.colour-editor{padding:13px}.colour-editor>header{align-items:flex-end}.modal h2{font-size:30px}
+}
+
+@media screen and (max-width:359px){
+  .topbar{padding-inline:12px}.topbar h1{font-size:16px}.page{padding-inline:12px}.mobile-nav a,.mobile-logout{font-size:7.5px}
+  .section-head{align-items:stretch;flex-direction:column}.section-head>button{width:100%}
+  .client-details{grid-template-columns:1fr}.client-details .wide,.payment-toggle{grid-column:auto}
+  .report-stats.three{grid-template-columns:1fr}.report-stats.three article:last-child{grid-column:auto}
+  .receipt-actions>div{grid-template-columns:1fr}.receipt-client dl{grid-template-columns:1fr}
+  .modal{padding-inline:14px}.modal>header{margin-inline:-14px;padding-inline:14px}.modal>footer{margin-inline:-14px;padding-inline:14px}
+}
+
+@media screen and (max-width:900px) and (max-height:500px) and (orientation:landscape){
+  .topbar{min-height:54px;padding-top:7px;padding-bottom:7px}.receipt-actions{top:54px}
+  .login-brand{min-height:100dvh}.login-form{min-height:100dvh}
+}
