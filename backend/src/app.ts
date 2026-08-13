@@ -45,12 +45,13 @@ app.use(cors({
   maxAge: 600,
 }));
 app.use(cookieParser());
-app.get('/health', async (_q, r, next) => {
+app.get('/health', async (req, res, next) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    r.json({ status: 'ok' });
+    res.json({ status: 'ok' });
   } catch (error) {
-    next(Object.assign(error as object, { status: 503 }));
+    console.error(JSON.stringify({ event: 'health_check_failed', requestId: req.requestId, errorType: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : 'Unknown error' }));
+    next(Object.assign(new Error('Service unavailable'), { status: 503 }));
   }
 });
 app.use('/api/auth', express.json({ limit: '32kb' }), authRoutes);

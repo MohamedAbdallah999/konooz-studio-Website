@@ -13,7 +13,7 @@ const origin = z.string().url().transform(value => {
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65_535).default(4000),
-  DATABASE_URL: z.string().min(1),
+  DATABASE_URL: z.string().trim().min(1),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   FRONTEND_ORIGIN: origin,
